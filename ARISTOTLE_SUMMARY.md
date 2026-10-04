@@ -1,3 +1,21 @@
+# Summary of changes for run 22dfe6ee-b07a-465f-8592-5e7605b89f0e
+I wrote `POLARITY_PROPOSAL.md`, a design proposal for deriving polarity instead of taking it as given. I didn't change any Lean code, and I added nothing new to Lean, so the proposal's new claims are not machine-checked.
+
+Your question ended in "…WHAT", so I read it as "what could polarity be derived from?". The file answers that in layers:
+
+- **Table 2 from Table 1 via Table 3.** The project already proves `pol_toLinear`. The proposal is to define polarity from the linear decomposition, computing the formula and its polarity together so the definition isn't circular. Table 2 then becomes a lemma.
+- **Table 1 from a generated class.** Section 1 of the paper describes the positive formulas as a closure: start from positive atoms, `1`, `0` and `!A`, and close under `⊗`, `⊕`, `⋁x` and `¬` of negative formulas (negative formulas are the dual). Using two inductive predicates for these classes, Table 1 and the paper's "no shared polarity" choice both become theorems.
+- **Atom polarity from neutral atoms.** No new proof is needed. Two existing results already do this:
+  - reading a positive atom as `!p₀` and a negative one as `?p₀` (`atomLL`, `pol_atomLL`), with every LU rule sound under that reading (`LL.of_provable_table3`);
+  - the substitution theorems, which make an atom's polarity say which formulas may be substituted for it.
+- **Justification from structural behaviour:** "positive" means the formula has structural rules on the left (it behaves like `!A`), "negative" the same on the right (like `?A`). There are three parts:
+  - **Soundness (already proved):** a positive formula proves its own `!`-version and a negative one is proved by its `?`-version (`IsNeutralLinear.bang_quest`).
+  - **Completeness fails (not yet in Lean):** `(1⊗1)⅋⊥` is neutral by Table 1 but equivalent to `1`, so it still has the structural behaviour. Polarity therefore can't be *defined* by provability; it is deliberately syntactic and decidable.
+  - **Optimality (conjecture):** no compositional table can be more generous than Table 1. I give candidate witnesses, but checking them needs proofs that certain sequents are unprovable, so I suggest a small phase-semantics countermodel.
+- **Remark and contrast:** the paper's semantic explanation (correlation spaces) is noted as out of scope. The modern focusing notion of polarity, which depends only on the head connective, is compared with LU's hereditary polarity, with a small proposed theorem relating the two.
+
+The file ends with a seven-step plan with rough sizes. Steps 1–4 don't depend on the open `cut_elimination` proof. The file is committed.
+
 # Summary of changes for run eced67a5-8751-45ef-81b9-f4a89871abea
 I made no changes, as you asked. These answers are based on the current `RequestProject/LU/Calculus.lean` and `Syntax.lean`.
 
