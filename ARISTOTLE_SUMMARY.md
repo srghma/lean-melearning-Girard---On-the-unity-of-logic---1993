@@ -1,0 +1,57 @@
+# Summary of changes for run 64c3f34e-dc42-4e7f-b817-09bfc683878a
+**No, the formalization is not complete.** I compared your typ file with the Lean code section by section. The core of the paper is formalized and matches it, but three things are missing or differ. The project builds, and it has exactly one `sorry`. The full comparison is in `COMPLETENESS_AUDIT.md`.
+
+**What is formalized and checked against the typ:**
+- **Tables 1 and 2:** transcribed and checked entry by entry.
+- **Table 3:** proved to agree with Tables 1–2 on polarities.
+- **Figs. 1–3:** all rules checked one by one, with one exception (the `N ⇒ P` rule below).
+- **The four fragments and their kinds of sequent:** match the typ.
+- **The Theorem of §6 for cut-free proofs:** fully proved for all four fragments. It uses only Lean's standard axioms. The head-variable remark is also proved.
+
+**What is incomplete:**
+1. **Cut elimination is not proved.** `cut_elimination` is the one `sorry`. So the Theorem with cuts (`fragment_theorem`) holds only assuming cut elimination. The paper doesn't prove it either: Remark (i) calls it "more or less obvious" and points to a forthcoming paper by J. Vauzeilles.
+2. **Several of the paper's claims are not formalized at all:**
+   - §4: LU is equivalent to ordinary linear logic.
+   - LU's rules are sound with respect to the Table 3 translation (only the polarity agreement is proved).
+   - The substitution property of the fragments.
+   - Remark (ii) on denotational semantics.
+   - The comparison with LJ and LC at the end of §6.
+   - The informal claims about isomorphisms and the associativity of disjunction.
+3. **One rule reads differently from your typ file.** For the left rule of `N ⇒ P` (classical implication, Fig. 3):
+   - The scanned PDF has misprints.
+   - Your typ file corrects them to a **multiplicative** rule (contexts `Γ, Λ` and `Δ, Π`).
+   - The Lean code uses the **additive** rule, which is the left rule of `N⊥ ⊕ P`, the decomposition Table 3 gives for `N ⇒ P`.
+
+**Why the additive rule:** the paper's proof for the classical fragment needs that every rule whose conclusion has \(\mu > 1\) has a premise with \(\mu\) at least as large. The multiplicative rule breaks this. I added `RequestProject/LU/MultiplicativeReading.lean` with a proof (no `sorry`) of a concrete instance: two cut-free provable classical premises, each with \(\mu = 1\), whose multiplicative conclusion has \(\mu = 2\). As a test I swapped the multiplicative rule into the calculus: only the classical case of the proof failed, and I reverted it. Whether the Theorem itself still holds under the multiplicative reading is open.
+
+Files changed: `COMPLETENESS_AUDIT.md` (new), `RequestProject/LU/MultiplicativeReading.lean` (new), and a new row in `LU_FORMALIZATION.md`. Everything is committed.
+
+## Suggested follow-up
+
+Your typ file writes the left rule for `N ⇒ P` (Fig. 3) as a multiplicative rule. The formalization uses the additive rule of `N⊥ ⊕ P` from Table 3, because the multiplicative version breaks the step of Girard's proof for the classical fragment. If you meant the multiplicative rule, I can switch the calculus to it and try to rework the classical-fragment proof, or look for a counterexample to the Theorem under that reading. I can also try to formalize one of the missing parts, such as the substitution property or the translation to LJ.
+
+# Summary of changes for run 3c81b62b-3b1d-43ee-bafc-af43e424a227
+I formalized Girard's *On the unity of logic* in Lean, in about 2,850 lines under `RequestProject/LU/`. The theorem of §6 is fully proved for cut-free proofs. The version with cuts depends on cut elimination for LU, which I did not prove: it is the one `sorry` in the project (`cut_elimination` in `MainTheorem.lean`). The paper also only claims it ("more or less obvious, but perhaps a bit too long to write down explicitly"). `LU_FORMALIZATION.md` maps each part of the paper to its Lean file.
+
+**What is formalized:**
+- **Language and polarities (§2, Tables 1–2):** `Syntax.lean`. Formulas use de Bruijn indices for bound variables.
+- **Table 3:** `Translation.lean` gives the decomposition into linear logic. `pol_toLinear` proves Tables 1–3 agree on polarities, and `isLinearConn_toLinear` proves the decomposition only uses linear connectives.
+- **The calculus LU (Figs. 1–3):** `Calculus.lean` has sequents `Γ;Γ' ⊢ Δ';Δ` as four multisets, about 90 cut-free rules, the three cut rules, and provability with and without cut.
+- **The four fragments of §6:** `Fragments.lean` defines classical, intuitionistic, neutral intuitionistic and linear formulas, μ, each fragment's notion of sequent, and "provable within the fragment".
+- **Subformula property:** `Subformula.lean`.
+
+**Proved results (no `sorry`, standard axioms only):**
+- `fragment_theorem_cutFree`: a sequent of any of the four fragments with a cut-free LU proof is provable within that fragment. Each fragment has its own result, following the paper's proof:
+  - linear: from the subformula property;
+  - neutral intuitionistic: by counting formulas in Γ; `neutral_headVariable` proves Γ has at most one formula;
+  - intuitionistic (`IntMain.lean`): uses the paper's invariant for ν ≠ 1, under which formulas may be added and positive or atomic ones removed; this is how the "bad" ⊃-left rule is replaced by the "good" one;
+  - classical (`ClMain.lean`): uses the paper's invariant for μ ≥ 2, removing formulas that contribute to μ; this is how the "bad" permeability rules are replaced by weakening.
+- `fragment_theorem_of_cutElimination`: the theorem for proofs with cuts, assuming cut elimination.
+- `fragment_theorem` is the paper's statement with cuts; it depends on the unproved `cut_elimination`.
+
+**Transcription choices you should know about:**
+- The left rule printed for `N ⇒ P` in Fig. 3 has evident misprints (`Q` for `P`, `;` for `,`). I used the additive left rule of `N⊥ ⊕ P`, which is what Table 3 decomposes `N ⇒ P` into.
+- As in the paper, the classical-implication rules with neutral arguments are omitted.
+- The paper's side remark that the fragments are closed under substitution for atoms is not formalized.
+
+The Properties table lists these results with their status; `cut_elimination` and `fragment_theorem` are marked in progress.
