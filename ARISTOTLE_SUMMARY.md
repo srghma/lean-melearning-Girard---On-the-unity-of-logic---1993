@@ -1,3 +1,31 @@
+# Summary of changes for run eced67a5-8751-45ef-81b9-f4a89871abea
+I made no changes, as you asked. These answers are based on the current `RequestProject/LU/Calculus.lean` and `Syntax.lean`.
+
+## 1. Making the central zones `CL` and `CR` Finsets
+
+**Yes, contraction comes for free, but weakening does not.** In a Finset, `insert A (insert A Γ') = insert A Γ'`. So once `::ₘ` becomes `insert` in the central zones, the premise and conclusion of `contrR` and `contrL` are the same sequent. The rules become `Rule [S] S`: harmless, so you could simply delete them. Keep `L` and `R` as multisets, because the linear zones must not contract (`A ⊗ A` is not `A`). Weakening stays a real rule: `ax`, `topR`, `zeroL`, `oneR` and `botL` require an empty central zone (`0`), so `weakL`/`weakR` are still needed. You could drop them only if you also allowed an arbitrary central context in the zero-premise rules, which departs further from the paper's Fig. 1.
+
+**Provability is unchanged.** Weakening and contraction are both available in the central zone, so a sequent is provable with Finsets exactly when it is provable with multisets. Two points work in your favour: central contexts are always shared between premises, never split, so the Finset version never needs a "split a set" operation; and a set-valued unbounded zone is a standard design (Andreoli's focused sequents use one).
+
+**Costs:**
+- **Decidable equality:** Finset needs `DecidableEq (Formula n)`. `Term` and `Formula` don't derive it today, because `Term.func` and `atom` take `Fin k → Term n`. You can write the instance by hand (the domain is finite) or use classical decidability.
+- **Harder case analysis on rules:** this is the main cost. With multisets, `A ::ₘ Γ' = X` determines `Γ' = X.erase A`. With sets, `insert A Γ' = X` allows `Γ'` either to contain `A` or not, so every proof that does case analysis on a rule instance gets extra cases. That affects the invariants in `Intuitionistic.lean` and `Classical.lean`, the absorption lemmas, and the `LJ`/`LK`/`LL` translations.
+- **Other rewrites:** `sh` becomes `Finset.image shift`, which is fine since `shift` is injective. `Sequent.formulas` and the `!Γ'`/`?Δ'` translations go through `.val`.
+- **Hidden contractions:** rules like `inL`, `outR`, `bangL` and `cutL` silently contract when the formula is already in the set, so the multiset-to-set correspondence of derivations is not one-to-one.
+
+**When it pays off:** mainly for the one open proof, `cut_elimination`. Built-in contraction, ideally together with an arbitrary central context in the zero-premise rules, removes the usual contraction-versus-cut problem. For the results already proved, it is mostly rework with no gain.
+
+## 2. Indexing `Sequent` by scope instead of storing it as a field
+
+**`structure Sequent (n : ℕ)` itself makes sense.** It matches `Formula n`. It removes the `S.scope` projections (about 25 uses), for example `A : Formula (S.scope + a.arity)` becomes `A : Formula (n + a.arity)`. It also makes `Sequent.subst : Subst n m → Sequent n → Sequent m` and `sh : Sequent n → Sequent (n+1)` typed operations. Finally, equalities between sequents become ordinary rather than dependent: today, equating two `Sequent.mk n …` values can produce dependent-type (`HEq`) side conditions.
+
+**But `Rule : List (Sequent n) → Sequent n → Prop` does not work as stated.** Four rules have their premise one scope up: `lallR`, `lexL`, `callR_A` and `callR_N` take a premise in `Sequent (n+1)` and conclude a `Sequent n`. A homogeneous list cannot express them. That is why the previous design made the scope a field: the current `Sequent` is the same thing as `Σ n, Sequent n`. Ways to do it:
+- **(a) Heterogeneous premises:** `Rule : {n : ℕ} → List (Σ m, Sequent m) → Sequent n → Prop`. This is the smallest change, but it is close to the current design.
+- **(b) A precise premise type:** `inductive Premise (n) | same : Sequent n → Premise n | up : Sequent (n+1) → Premise n`, with `Rule n : List (Premise n) → Sequent n → Prop`. The types then say exactly that a premise is in scope `n` or `n+1`. `Derivable R P : {n : ℕ} → Sequent n → Prop` gets two hypotheses, `∀ s, .same s ∈ ps → Derivable s` and `∀ s, .up s ∈ ps → Derivable s`. Keep them as two hypotheses rather than one `match` on the premise, so the inductive type stays strictly positive.
+- **(c) One constructor per rule:** `inductive Proves : {n : ℕ} → Sequent n → Prop` with each LU rule as a constructor. This is the most idiomatic option for well-scoped syntax, but you lose the generic `Derivable R P` framework. That framework is what `ProvableWithin` relies on: it requires every sequent in the derivation to satisfy a fragment predicate. You would have to thread `P : ∀ {n}, Sequent n → Prop` through every constructor.
+
+**Recommendation:** index `Sequent` by `n`, and use (b) for `Rule`/`Derivable`, with `P : ∀ {n}, Sequent n → Prop`. The fragment predicates are already uniform in the scope, so this fits easily. The proof changes would be mostly mechanical. The gain is cleaner statements, not new results.
+
 # Summary of changes for run b39f6d29-736c-4cd0-bce3-9044cf747a09
 Yes, the syntax should be indexed by scope. I changed it, and every file that uses it now builds with the new types. Nothing changed in what is proved: the only `sorry` is still `cut_elimination`, which the paper only claims too. The key theorems (`fragment_theorem_cutFree`, `ProvableWithin.substPred`, `provable_iff_LL`, `LL.of_provable_table3`, `multiplicative_impL_NP_breaks_mu`) use only the standard axioms.
 
