@@ -1,3 +1,35 @@
+# Summary of changes for run b39f6d29-736c-4cd0-bce3-9044cf747a09
+Yes, the syntax should be indexed by scope. I changed it, and every file that uses it now builds with the new types. Nothing changed in what is proved: the only `sorry` is still `cut_elimination`, which the paper only claims too. The key theorems (`fragment_theorem_cutFree`, `ProvableWithin.substPred`, `provable_iff_LL`, `LL.of_provable_table3`, `multiplicative_impL_NP_breaks_mu`) use only the standard axioms.
+
+**Terms** (`Syntax.lean`)
+```lean
+structure Func where name : ℕ; arity : ℕ
+inductive Term (n : ℕ) where
+  | var : Fin n → Term n
+  | func (f : Func) : (Fin f.arity → Term n) → Term n
+```
+`Term 0` is the type of closed terms. One change from your sketch: function symbols are not `Fin n`. The scope `n` counts variables, not symbols. Instead each symbol carries its arity, and its arguments are a tuple of exactly `f.arity` terms, so the wrong number of arguments can't be written.
+
+**Predicates and formulas**
+- An atom has exactly as many arguments as its predicate's arity: `atom (p : Pred) (ts : Fin p.arity → Term n) : Formula n`.
+- `Formula : ℕ → Type` is indexed by scope, and the body of a quantifier is a `Formula (n + 1)`.
+- `Formula 0` (abbreviation `ClosedFormula`) is the type of closed formulas.
+- `Pred` keeps its name, arity and polarity but has no scope index, because a predicate symbol mentions no variables.
+- There is one simultaneous substitution, `Formula.subst` (with `Subst n m := Fin n → Term m`), which avoids capture by construction. Weakening (`shift`) and instantiation (`inst`, i.e. `A[t/x]`) are special cases of it, and its composition laws are proved.
+
+**Other constructs**
+- **Sequents:** a `Sequent` has a field `scope`, and its four zones are multisets of `Formula scope`, so every formula in a sequent lives in the same context; scope 0 means a closed sequent. The scope is a field rather than a type index because the premise of an eigenvariable rule lives in scope `n + 1`, and a derivation still has to be a tree of sequents.
+- **Eigenvariable condition:** it now holds by construction. The premise is in scope `n + 1` and its context is the weakened context, which cannot mention the fresh variable. The same holds in the linear-logic, LJ and LK calculi (`LL`, `LJ`, `LK`), which are now indexed by scope.
+- **Substitution of a formula for an atom** (§6): `substPred a (A : Formula (n + a.arity)) (B : Formula n)`. The types force `A` to have exactly as many distinguished variables as the atom's arity, and its parameters are weakened under binders so they are never captured. The provability theorems take `A : Formula (S.scope + a.arity)`.
+- **Example:** the counterexample in `MultiplicativeReading.lean` now uses closed atoms (`Formula 0`).
+
+**Proof changes forced by the new types**
+- The invariants of the intuitionistic and classical proofs quantified over arbitrary target sequents. They now quantify over the four zones at the same scope, which is equivalent.
+- The absorption lemmas in `Classical.lean` now name the premise by its zones.
+- The old shift and index-substitution lemmas were replaced by single lemmas about `subst`, e.g. `toLL_subst` and `isClassical_subst`.
+
+`LU_FORMALIZATION.md` and the Properties table are updated. The table has new entries for `Term`, `Formula` and `Sequent`, and the changed statements are back to proved after the rebuild. The whole project builds and everything is committed.
+
 # Summary of changes for run e0698a9a-a9f4-424b-b383-cb72c12d6c24
 I fixed every open item except cut elimination for LU. That is still the project's only `sorry` (`cut_elimination` in `MainTheorem.lean`), and the paper only claims it too (Remark (i)). The whole project builds, and every new theorem uses only the standard axioms (`propext`, `Classical.choice`, `Quot.sound`).
 

@@ -26,6 +26,8 @@ LU that is more or less obvious (but perhaps a bit too long to write down explic
 
 namespace LU
 
+variable {n : ℕ}
+
 /-- A proof within a fragment is in particular a cut-free proof. -/
 theorem ProvableWithin.cutFreeProvable {F : Fragment} {S : Sequent}
     (h : ProvableWithin F S) : CutFreeProvable S :=

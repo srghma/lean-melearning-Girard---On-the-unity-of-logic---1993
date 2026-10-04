@@ -17,10 +17,14 @@ This file fixes the language of the unified sequent calculus **LU**
 Every formula receives a polarity (§2, Tables 1 and 2); the polarity function
 `Formula.pol` below is a literal transcription of these tables.
 
-First-order variables are represented with de Bruijn indices: the body of a quantifier
-uses the index `0` for the bound variable.  `A[t/x]` (substitution of the term `t` for the
-bound variable) is `Formula.inst A t`, and the eigenvariable condition "`x` not free in the
-context" is expressed by shifting the context (`Formula.shift`).
+Terms and formulas are *well-scoped by construction* (indexed by the number of free
+variables in scope, with de Bruijn indices `Fin n`), and atoms and function applications
+always have the number of arguments prescribed by the arity of their symbol: `Term 0` and
+`Formula 0` are the closed terms and closed formulas.  The body of a quantifier over
+`Formula n` is a `Formula (n + 1)` whose bound variable is the index `0`.
+`A[t/x]` (substitution of the term `t` for the bound variable) is `Formula.inst A t`, and the
+eigenvariable condition "`x` not free in the context" is expressed by weakening the context
+into the larger scope (`Formula.shift`).
 -/
 
 @[expose] public section
@@ -126,27 +130,141 @@ def iimp : Pol → Pol → Pol
 
 end Pol
 
-/-! ## Terms and formulas -/
+/-! ## Terms and formulas
 
-/-- First-order terms, with de Bruijn indices for variables. -/
-inductive Term where
-  | var : ℕ → Term
-  | func : ℕ → List Term → Term
-  deriving Inhabited
+Terms and formulas are *well-scoped by construction*: `Term n` and `Formula n` only contain
+free variables taken from `Fin n` (de Bruijn indices `0, …, n-1`), and every function or
+predicate symbol is applied to exactly as many arguments as its arity.  In particular
+`Term 0` is the type of closed terms and `Formula 0` the type of closed formulas.
+The body of a quantifier over `Formula n` is a `Formula (n + 1)`, in which the bound variable
+is the index `0`. -/
+
+/-- A function symbol: a name and an arity. -/
+structure Func where
+  name : ℕ
+  arity : ℕ
+  deriving DecidableEq
+
+/-- First-order terms whose free variables are among `Fin n` (de Bruijn indices).
+A function symbol `f` is applied to exactly `f.arity` arguments. -/
+inductive Term (n : ℕ) where
+  /-- a variable in scope -/
+  | var : Fin n → Term n
+  /-- `f t₁ … tₖ` with `k = f.arity` -/
+  | func (f : Func) : (Fin f.arity → Term n) → Term n
+
+/-- A substitution from scope `n` to scope `m`: a term of scope `m` for each variable. -/
+abbrev Subst (n m : ℕ) := Fin n → Term m
 
 namespace Term
 
-/-- Lift every variable `≥ c` by one. -/
-def shift (c : ℕ) : Term → Term
-  | var n => if n < c then var n else var (n + 1)
-  | func f ts => func f (ts.map (shift c))
+instance {n : ℕ} : Inhabited (Term n) := ⟨func ⟨0, 0⟩ Fin.elim0⟩
 
-/-- Substitute `s` for the variable `k` (and lower the variables above `k`). -/
-def subst (k : ℕ) (s : Term) : Term → Term
-  | var n => if n < k then var n else if n = k then s else var (n - 1)
-  | func f ts => func f (ts.map (subst k s))
+/-- Renaming of variables along `ρ : Fin n → Fin m`. -/
+def rename {n m : ℕ} (ρ : Fin n → Fin m) : Term n → Term m
+  | var i => var (ρ i)
+  | func f ts => func f (fun i => (ts i).rename ρ)
+
+/-- Weakening: a term of scope `n` seen in scope `n + 1` (all variables lifted by one). -/
+def shift {n : ℕ} (t : Term n) : Term (n + 1) := t.rename Fin.succ
+
+/-- Simultaneous substitution of `σ i` for each variable `i`. -/
+def subst {n m : ℕ} (σ : Subst n m) : Term n → Term m
+  | var i => σ i
+  | func f ts => func f (fun i => (ts i).subst σ)
+
+@[simp] theorem rename_var {n m : ℕ} (ρ : Fin n → Fin m) (i : Fin n) :
+    (var i).rename ρ = var (ρ i) := rfl
+
+@[simp] theorem subst_var {n m : ℕ} (σ : Subst n m) (i : Fin n) : (var i).subst σ = σ i := rfl
+
+@[simp] theorem shift_var {n : ℕ} (i : Fin n) : (var i).shift = var i.succ := rfl
+
+theorem rename_rename {n m k : ℕ} (ρ : Fin n → Fin m) (ρ' : Fin m → Fin k) :
+    ∀ t : Term n, (t.rename ρ).rename ρ' = t.rename (ρ' ∘ ρ)
+  | var i => rfl
+  | func f ts => by
+    simp only [rename]; congr 1; funext i; exact rename_rename ρ ρ' (ts i)
+
+theorem subst_rename {n m k : ℕ} (ρ : Fin n → Fin m) (σ : Subst m k) :
+    ∀ t : Term n, (t.rename ρ).subst σ = t.subst (σ ∘ ρ)
+  | var i => rfl
+  | func f ts => by
+    simp only [rename, subst]; congr 1; funext i; exact subst_rename ρ σ (ts i)
+
+theorem rename_subst {n m k : ℕ} (σ : Subst n m) (ρ : Fin m → Fin k) :
+    ∀ t : Term n, (t.subst σ).rename ρ = t.subst (fun i => (σ i).rename ρ)
+  | var i => rfl
+  | func f ts => by
+    simp only [rename, subst]; congr 1; funext i; exact rename_subst σ ρ (ts i)
+
+theorem subst_subst {n m k : ℕ} (σ : Subst n m) (τ : Subst m k) :
+    ∀ t : Term n, (t.subst σ).subst τ = t.subst (fun i => (σ i).subst τ)
+  | var i => rfl
+  | func f ts => by
+    simp only [subst]; congr 1; funext i; exact subst_subst σ τ (ts i)
+
+@[simp] theorem subst_var_eq {n : ℕ} : ∀ t : Term n, t.subst var = t
+  | var i => rfl
+  | func f ts => by
+    simp only [subst]; congr 1; funext i; exact subst_var_eq (ts i)
+
+theorem rename_eq_subst {n m : ℕ} (ρ : Fin n → Fin m) :
+    ∀ t : Term n, t.rename ρ = t.subst (fun i => var (ρ i))
+  | var i => rfl
+  | func f ts => by
+    simp only [rename, subst]; congr 1; funext i; exact rename_eq_subst ρ (ts i)
+
+@[simp] theorem shift_subst_cons {n m : ℕ} (σ : Subst n m) (s : Term m) (t : Term n) :
+    t.shift.subst (Fin.cons s σ) = t.subst σ := by
+  simp only [shift, subst_rename]; rfl
+
+theorem shift_subst {n m : ℕ} (σ : Subst n m) (t : Term n) :
+    (t.subst σ).shift = t.subst (fun i => (σ i).shift) := by
+  simp only [shift, rename_subst]
 
 end Term
+
+namespace Subst
+
+/-- The identity substitution. -/
+abbrev id (n : ℕ) : Subst n n := Term.var
+
+/-- Lifting a substitution under a binder: the bound variable `0` is kept, the other
+variables are substituted and then weakened. -/
+def lift {n m : ℕ} (σ : Subst n m) : Subst (n + 1) (m + 1) :=
+  Fin.cons (Term.var 0) (fun i => (σ i).shift)
+
+/-- The weakening substitution `i ↦ i + 1` (used for the eigenvariable condition). -/
+def weaken (n : ℕ) : Subst n (n + 1) := fun i => Term.var i.succ
+
+/-- `[t/0]`: substitute `t` for the variable `0` and lower the other variables. -/
+def single {n : ℕ} (t : Term n) : Subst (n + 1) n := Fin.cons t Term.var
+
+@[simp] theorem lift_zero {n m : ℕ} (σ : Subst n m) : lift σ 0 = Term.var 0 := rfl
+
+@[simp] theorem lift_succ {n m : ℕ} (σ : Subst n m) (i : Fin n) :
+    lift σ i.succ = (σ i).shift := rfl
+
+@[simp] theorem single_zero {n : ℕ} (t : Term n) : single t 0 = t := rfl
+
+@[simp] theorem single_succ {n : ℕ} (t : Term n) (i : Fin n) : single t i.succ = Term.var i :=
+  rfl
+
+@[simp] theorem weaken_apply {n : ℕ} (i : Fin n) : weaken n i = Term.var i.succ := rfl
+
+@[simp] theorem lift_id {n : ℕ} : lift (Term.var : Subst n n) = Term.var := by
+  funext i; refine Fin.cases rfl (fun j => rfl) i
+
+/-- Lifting commutes with composition of substitutions. -/
+theorem lift_comp {n m k : ℕ} (σ : Subst n m) (τ : Subst m k) :
+    (fun i => (lift σ i).subst (lift τ)) = lift (fun i => (σ i).subst τ) := by
+  funext i
+  refine Fin.cases rfl (fun j => ?_) i
+  simp only [lift_succ, Term.shift]
+  rw [Term.subst_rename, Term.rename_subst]; rfl
+
+end Subst
 
 /-- A predicate symbol: a name, an arity and a polarity
 ("atomic predicates are given with their polarity", §6). -/
@@ -156,110 +274,145 @@ structure Pred where
   pol : Pol
   deriving DecidableEq
 
-/-- The formulas of LU (§6). -/
-inductive Formula where
-  /-- atomic formula `a t₁ … tₙ` -/
-  | atom : Pred → List Term → Formula
+/-- The formulas of LU (§6) whose free variables are among `Fin n`.
+Quantifiers bind the variable `0` of a body in scope `n + 1`;
+an atom `p t₁ … tₖ` has exactly `k = p.arity` arguments. -/
+inductive Formula : ℕ → Type where
+  /-- atomic formula `p t₁ … tₖ`, with `k = p.arity` -/
+  | atom {n : ℕ} (p : Pred) (ts : Fin p.arity → Term n) : Formula n
   /-- the constant `1` (also denoted `V`) -/
-  | one : Formula
+  | one {n : ℕ} : Formula n
   /-- the constant `0` (also denoted `F`) -/
-  | zero : Formula
+  | zero {n : ℕ} : Formula n
   /-- the constant `⊥` -/
-  | bot : Formula
+  | bot {n : ℕ} : Formula n
   /-- the constant `⊤` -/
-  | top : Formula
+  | top {n : ℕ} : Formula n
   /-- linear negation `A⊥` (also denoted `¬A`) -/
-  | neg : Formula → Formula
+  | neg {n : ℕ} : Formula n → Formula n
   /-- `!A` -/
-  | bang : Formula → Formula
+  | bang {n : ℕ} : Formula n → Formula n
   /-- `?A` -/
-  | quest : Formula → Formula
+  | quest {n : ℕ} : Formula n → Formula n
   /-- `A ⊗ B` -/
-  | tensor : Formula → Formula → Formula
+  | tensor {n : ℕ} : Formula n → Formula n → Formula n
   /-- `A ⅋ B` -/
-  | par : Formula → Formula → Formula
+  | par {n : ℕ} : Formula n → Formula n → Formula n
   /-- `A ⊸ B` -/
-  | lolli : Formula → Formula → Formula
+  | lolli {n : ℕ} : Formula n → Formula n → Formula n
   /-- `A & B` -/
-  | with_ : Formula → Formula → Formula
+  | with_ {n : ℕ} : Formula n → Formula n → Formula n
   /-- `A ⊕ B` -/
-  | plus : Formula → Formula → Formula
+  | plus {n : ℕ} : Formula n → Formula n → Formula n
   /-- conjunction `A ∧ B` (classical and intuitionistic) -/
-  | conj : Formula → Formula → Formula
+  | conj {n : ℕ} : Formula n → Formula n → Formula n
   /-- disjunction `A ∨ B` (classical and intuitionistic) -/
-  | disj : Formula → Formula → Formula
+  | disj {n : ℕ} : Formula n → Formula n → Formula n
   /-- classical implication `A ⇒ B` -/
-  | imp : Formula → Formula → Formula
+  | imp {n : ℕ} : Formula n → Formula n → Formula n
   /-- intuitionistic implication `A ⊃ B` -/
-  | iimp : Formula → Formula → Formula
-  /-- linear universal quantifier `⋀x A` (body uses de Bruijn index `0`) -/
-  | lall : Formula → Formula
+  | iimp {n : ℕ} : Formula n → Formula n → Formula n
+  /-- linear universal quantifier `⋀x A` (the body binds the variable `0`) -/
+  | lall {n : ℕ} : Formula (n + 1) → Formula n
   /-- linear existential quantifier `⋁x A` -/
-  | lex : Formula → Formula
+  | lex {n : ℕ} : Formula (n + 1) → Formula n
   /-- classical universal quantifier `∀x A` -/
-  | call : Formula → Formula
+  | call {n : ℕ} : Formula (n + 1) → Formula n
   /-- existential quantifier `∃x A` (classical and intuitionistic) -/
-  | cex : Formula → Formula
-  deriving Inhabited
+  | cex {n : ℕ} : Formula (n + 1) → Formula n
+
+/-- Closed formulas (no free variable). -/
+abbrev ClosedFormula := Formula 0
 
 namespace Formula
 
-/-- Lift every free variable `≥ c` by one. -/
-def shiftFrom (c : ℕ) : Formula → Formula
-  | atom p ts => atom p (ts.map (Term.shift c))
-  | one => one
-  | zero => zero
-  | bot => bot
-  | top => top
-  | neg A => neg (A.shiftFrom c)
-  | bang A => bang (A.shiftFrom c)
-  | quest A => quest (A.shiftFrom c)
-  | tensor A B => tensor (A.shiftFrom c) (B.shiftFrom c)
-  | par A B => par (A.shiftFrom c) (B.shiftFrom c)
-  | lolli A B => lolli (A.shiftFrom c) (B.shiftFrom c)
-  | with_ A B => with_ (A.shiftFrom c) (B.shiftFrom c)
-  | plus A B => plus (A.shiftFrom c) (B.shiftFrom c)
-  | conj A B => conj (A.shiftFrom c) (B.shiftFrom c)
-  | disj A B => disj (A.shiftFrom c) (B.shiftFrom c)
-  | imp A B => imp (A.shiftFrom c) (B.shiftFrom c)
-  | iimp A B => iimp (A.shiftFrom c) (B.shiftFrom c)
-  | lall A => lall (A.shiftFrom (c + 1))
-  | lex A => lex (A.shiftFrom (c + 1))
-  | call A => call (A.shiftFrom (c + 1))
-  | cex A => cex (A.shiftFrom (c + 1))
+instance {n : ℕ} : Inhabited (Formula n) := ⟨one⟩
 
-/-- Lift all free variables by one (used for the eigenvariable condition). -/
-def shift (A : Formula) : Formula := A.shiftFrom 0
+/-- Simultaneous substitution of terms for the free variables of a formula
+(capture-avoiding by construction: the substitution is lifted under binders). -/
+def subst {n m : ℕ} : Formula n → Subst n m → Formula m
+  | atom p ts, σ => atom p (fun i => (ts i).subst σ)
+  | one, _ => one
+  | zero, _ => zero
+  | bot, _ => bot
+  | top, _ => top
+  | neg A, σ => neg (A.subst σ)
+  | bang A, σ => bang (A.subst σ)
+  | quest A, σ => quest (A.subst σ)
+  | tensor A B, σ => tensor (A.subst σ) (B.subst σ)
+  | par A B, σ => par (A.subst σ) (B.subst σ)
+  | lolli A B, σ => lolli (A.subst σ) (B.subst σ)
+  | with_ A B, σ => with_ (A.subst σ) (B.subst σ)
+  | plus A B, σ => plus (A.subst σ) (B.subst σ)
+  | conj A B, σ => conj (A.subst σ) (B.subst σ)
+  | disj A B, σ => disj (A.subst σ) (B.subst σ)
+  | imp A B, σ => imp (A.subst σ) (B.subst σ)
+  | iimp A B, σ => iimp (A.subst σ) (B.subst σ)
+  | lall A, σ => lall (A.subst (Subst.lift σ))
+  | lex A, σ => lex (A.subst (Subst.lift σ))
+  | call A, σ => call (A.subst (Subst.lift σ))
+  | cex A, σ => cex (A.subst (Subst.lift σ))
 
-/-- Substitute the term `s` for the variable `k`. -/
-def substAt (k : ℕ) (s : Term) : Formula → Formula
-  | atom p ts => atom p (ts.map (Term.subst k s))
-  | one => one
-  | zero => zero
-  | bot => bot
-  | top => top
-  | neg A => neg (A.substAt k s)
-  | bang A => bang (A.substAt k s)
-  | quest A => quest (A.substAt k s)
-  | tensor A B => tensor (A.substAt k s) (B.substAt k s)
-  | par A B => par (A.substAt k s) (B.substAt k s)
-  | lolli A B => lolli (A.substAt k s) (B.substAt k s)
-  | with_ A B => with_ (A.substAt k s) (B.substAt k s)
-  | plus A B => plus (A.substAt k s) (B.substAt k s)
-  | conj A B => conj (A.substAt k s) (B.substAt k s)
-  | disj A B => disj (A.substAt k s) (B.substAt k s)
-  | imp A B => imp (A.substAt k s) (B.substAt k s)
-  | iimp A B => iimp (A.substAt k s) (B.substAt k s)
-  | lall A => lall (A.substAt (k + 1) (s.shift 0))
-  | lex A => lex (A.substAt (k + 1) (s.shift 0))
-  | call A => call (A.substAt (k + 1) (s.shift 0))
-  | cex A => cex (A.substAt (k + 1) (s.shift 0))
+/-- Weakening: a formula of scope `n` seen in scope `n + 1` (used for the eigenvariable
+condition: a formula of the context cannot mention the fresh variable `0`). -/
+def shift {n : ℕ} (A : Formula n) : Formula (n + 1) := A.subst (Subst.weaken n)
 
-/-- `A[t/x]`: instantiate the bound variable (de Bruijn index `0`) of a quantifier body. -/
-def inst (A : Formula) (t : Term) : Formula := A.substAt 0 t
+/-- `A[t/x]`: instantiate the bound variable (index `0`) of a quantifier body. -/
+def inst {n : ℕ} (A : Formula (n + 1)) (t : Term n) : Formula n := A.subst (Subst.single t)
+
+theorem subst_subst {n m k : ℕ} (A : Formula n) (σ : Subst n m) (τ : Subst m k) :
+    (A.subst σ).subst τ = A.subst (fun i => (σ i).subst τ) := by
+  induction A generalizing m k with
+  | atom p ts => simp only [subst, Term.subst_subst]
+  | lall A ih => simp only [subst, ih, Subst.lift_comp]
+  | lex A ih => simp only [subst, ih, Subst.lift_comp]
+  | call A ih => simp only [subst, ih, Subst.lift_comp]
+  | cex A ih => simp only [subst, ih, Subst.lift_comp]
+  | _ => simp_all [subst]
+
+@[simp] theorem subst_id {n : ℕ} (A : Formula n) : A.subst Term.var = A := by
+  induction A with
+  | atom p ts => simp [subst]
+  | _ => simp_all [subst]
+
+theorem subst_congr {n m : ℕ} (A : Formula n) {σ τ : Subst n m} (h : ∀ i, σ i = τ i) :
+    A.subst σ = A.subst τ := by
+  rw [funext h]
+
+/-- Weakening commutes with substitution. -/
+theorem shift_subst {n m : ℕ} (A : Formula n) (σ : Subst n m) :
+    (A.subst σ).shift = A.shift.subst (Subst.lift σ) := by
+  simp only [shift, subst_subst]
+  apply subst_congr
+  intro i
+  simp only [Subst.weaken_apply, Term.subst_var, Subst.lift_succ, Term.shift,
+    Term.rename_eq_subst]
+  rfl
+
+/-- Instantiation commutes with substitution. -/
+theorem inst_subst {n m : ℕ} (A : Formula (n + 1)) (t : Term n) (σ : Subst n m) :
+    (A.inst t).subst σ = (A.subst (Subst.lift σ)).inst (t.subst σ) := by
+  simp only [inst, subst_subst]
+  apply subst_congr
+  intro i
+  refine Fin.cases rfl (fun j => ?_) i
+  simp [Subst.single, Subst.lift]
+
+/-- Instantiating a weakened formula does nothing. -/
+@[simp] theorem shift_inst {n : ℕ} (A : Formula n) (t : Term n) : A.shift.inst t = A := by
+  simp only [shift, inst, subst_subst]
+  exact subst_id A
+
+/-- Instantiating with the fresh variable `0` a body lifted under a binder gives it back. -/
+@[simp] theorem subst_lift_weaken_inst {n : ℕ} (A : Formula (n + 1)) :
+    (A.subst (Subst.lift (Subst.weaken n))).inst (Term.var 0) = A := by
+  simp only [inst, subst_subst]
+  convert subst_id A using 2
+  funext i
+  refine Fin.cases rfl (fun j => rfl) i
 
 /-- The polarity of a formula (§2, Tables 1 and 2). -/
-def pol : Formula → Pol
+def pol {n : ℕ} : Formula n → Pol
   | atom p _ => p.pol
   | one => .pos
   | zero => .pos
@@ -282,15 +435,14 @@ def pol : Formula → Pol
   | call _ => .neg
   | cex _ => .pos
 
-@[simp] theorem pol_shiftFrom (c : ℕ) (A : Formula) : (A.shiftFrom c).pol = A.pol := by
-  induction A generalizing c <;> simp_all [shiftFrom, pol]
+@[simp] theorem pol_subst {n m : ℕ} (A : Formula n) (σ : Subst n m) :
+    (A.subst σ).pol = A.pol := by
+  induction A generalizing m <;> simp_all [subst, pol]
 
-@[simp] theorem pol_shift (A : Formula) : A.shift.pol = A.pol := pol_shiftFrom 0 A
+@[simp] theorem pol_shift {n : ℕ} (A : Formula n) : A.shift.pol = A.pol := pol_subst A _
 
-@[simp] theorem pol_substAt (k : ℕ) (s : Term) (A : Formula) : (A.substAt k s).pol = A.pol := by
-  induction A generalizing k s <;> simp_all [substAt, pol]
-
-@[simp] theorem pol_inst (A : Formula) (t : Term) : (A.inst t).pol = A.pol := pol_substAt 0 t A
+@[simp] theorem pol_inst {n : ℕ} (A : Formula (n + 1)) (t : Term n) : (A.inst t).pol = A.pol :=
+  pol_subst A _
 
 end Formula
 

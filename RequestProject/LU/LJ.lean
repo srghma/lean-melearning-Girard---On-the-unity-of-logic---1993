@@ -31,50 +31,52 @@ intuitionistic fragment (`V = 1`, `F = 0`, `∧`, `∨`, `⊃`, `⋀x`, `∃x`, 
 
 namespace LU
 
+variable {n : ℕ}
+
 open Formula
 
 /-- Gentzen's sequent calculus LJ (with weakening and contraction, without cut) for the
 connectives of the intuitionistic fragment.  `LJ Γ C` means `Γ ⊢ C`. -/
-inductive LJ : Multiset Formula → Formula → Prop where
-  | ax (A : Formula) : LJ {A} A
-  | weak {Γ : Multiset Formula} {C : Formula} (A : Formula) : LJ Γ C → LJ (A ::ₘ Γ) C
-  | contr {Γ : Multiset Formula} {C : Formula} (A : Formula) :
+inductive LJ : {n : ℕ} → Multiset (Formula n) → Formula n → Prop where
+  | ax {n : ℕ} (A : Formula n) : LJ {A} A
+  | weak {n : ℕ} {Γ : Multiset (Formula n)} {C : Formula n} (A : Formula n) : LJ Γ C → LJ (A ::ₘ Γ) C
+  | contr {n : ℕ} {Γ : Multiset (Formula n)} {C : Formula n} (A : Formula n) :
       LJ (A ::ₘ A ::ₘ Γ) C → LJ (A ::ₘ Γ) C
-  | trueR : LJ 0 one
-  | falseL (Γ : Multiset Formula) (C : Formula) : LJ (zero ::ₘ Γ) C
-  | conjR {Γ : Multiset Formula} {A B : Formula} : LJ Γ A → LJ Γ B → LJ Γ (conj A B)
-  | conjL {Γ : Multiset Formula} {A B C : Formula} :
+  | trueR {n : ℕ} : LJ 0 (one : Formula n)
+  | falseL {n : ℕ} (Γ : Multiset (Formula n)) (C : Formula n) : LJ (zero ::ₘ Γ) C
+  | conjR {n : ℕ} {Γ : Multiset (Formula n)} {A B : Formula n} : LJ Γ A → LJ Γ B → LJ Γ (conj A B)
+  | conjL {n : ℕ} {Γ : Multiset (Formula n)} {A B C : Formula n} :
       LJ (A ::ₘ B ::ₘ Γ) C → LJ (conj A B ::ₘ Γ) C
-  | disjR₁ {Γ : Multiset Formula} {A B : Formula} : LJ Γ A → LJ Γ (disj A B)
-  | disjR₂ {Γ : Multiset Formula} {A B : Formula} : LJ Γ B → LJ Γ (disj A B)
-  | disjL {Γ : Multiset Formula} {A B C : Formula} :
+  | disjR₁ {n : ℕ} {Γ : Multiset (Formula n)} {A B : Formula n} : LJ Γ A → LJ Γ (disj A B)
+  | disjR₂ {n : ℕ} {Γ : Multiset (Formula n)} {A B : Formula n} : LJ Γ B → LJ Γ (disj A B)
+  | disjL {n : ℕ} {Γ : Multiset (Formula n)} {A B C : Formula n} :
       LJ (A ::ₘ Γ) C → LJ (B ::ₘ Γ) C → LJ (disj A B ::ₘ Γ) C
-  | iimpR {Γ : Multiset Formula} {A B : Formula} : LJ (A ::ₘ Γ) B → LJ Γ (iimp A B)
-  | iimpL {Γ : Multiset Formula} {A B C : Formula} :
+  | iimpR {n : ℕ} {Γ : Multiset (Formula n)} {A B : Formula n} : LJ (A ::ₘ Γ) B → LJ Γ (iimp A B)
+  | iimpL {n : ℕ} {Γ : Multiset (Formula n)} {A B C : Formula n} :
       LJ Γ A → LJ (B ::ₘ Γ) C → LJ (iimp A B ::ₘ Γ) C
-  /-- `⋀x`-right, with the eigenvariable condition expressed by shifting the context. -/
-  | allR {Γ : Multiset Formula} {A : Formula} : LJ (sh Γ) A → LJ Γ (lall A)
-  | allL {Γ : Multiset Formula} {A C : Formula} (t : Term) :
+  /-- `⋀x`-right, with the eigenvariable condition expressed by weakening the context. -/
+  | allR {n : ℕ} {Γ : Multiset (Formula n)} {A : Formula (n + 1)} : LJ (sh Γ) A → LJ Γ (lall A)
+  | allL {n : ℕ} {Γ : Multiset (Formula n)} {A : Formula (n + 1)} {C : Formula n} (t : Term n) :
       LJ (A.inst t ::ₘ Γ) C → LJ (lall A ::ₘ Γ) C
-  | exR {Γ : Multiset Formula} {A : Formula} (t : Term) : LJ Γ (A.inst t) → LJ Γ (cex A)
-  /-- `∃x`-left, with the eigenvariable condition expressed by shifting the context. -/
-  | exL {Γ : Multiset Formula} {A C : Formula} : LJ (A ::ₘ sh Γ) C.shift → LJ (cex A ::ₘ Γ) C
+  | exR {n : ℕ} {Γ : Multiset (Formula n)} {A : Formula (n + 1)} (t : Term n) : LJ Γ (A.inst t) → LJ Γ (cex A)
+  /-- `∃x`-left, with the eigenvariable condition expressed by weakening the context. -/
+  | exL {n : ℕ} {Γ : Multiset (Formula n)} {A : Formula (n + 1)} {C : Formula n} : LJ (A ::ₘ sh Γ) C.shift → LJ (cex A ::ₘ Γ) C
 
 namespace LJ
 
-theorem weaken {Γ : Multiset Formula} {C : Formula} (h : LJ Γ C) :
-    ∀ Δ : Multiset Formula, LJ (Γ + Δ) C := by
+theorem weaken {Γ : Multiset (Formula n)} {C : Formula n} (h : LJ Γ C) :
+    ∀ Δ : Multiset (Formula n), LJ (Γ + Δ) C := by
   intro Δ
   induction Δ using Multiset.induction_on with
   | empty => simpa using h
   | cons A Δ ih => rw [Multiset.add_cons]; exact ih.weak A
 
-theorem weaken_le {Γ Δ : Multiset Formula} {C : Formula} (h : LJ Γ C) (hle : Γ ≤ Δ) :
+theorem weaken_le {Γ Δ : Multiset (Formula n)} {C : Formula n} (h : LJ Γ C) (hle : Γ ≤ Δ) :
     LJ Δ C := by
   obtain ⟨E, rfl⟩ := Multiset.le_iff_exists_add.1 hle
   exact h.weaken E
 
-theorem congr {Γ Δ : Multiset Formula} {C : Formula} (h : LJ Γ C) (e : Γ = Δ) : LJ Δ C :=
+theorem congr {Γ Δ : Multiset (Formula n)} {C : Formula n} (h : LJ Γ C) (e : Γ = Δ) : LJ Δ C :=
   e ▸ h
 
 end LJ
@@ -249,11 +251,11 @@ theorem ljWithin_aux {S : Sequent} (h : ProvableWithin .intuitionistic S) :
 
 /-- **Soundness of the translation `Γ;Γ' ⊢ ;A ↦ Γ, Γ' ⊢ A`** (end of §6, item 1): a sequent
 provable within the intuitionistic fragment translates to an LJ-provable sequent. -/
-theorem LJ.of_provableWithin_intuitionistic {Γ Γ' : Multiset Formula} {A : Formula}
+theorem LJ.of_provableWithin_intuitionistic {Γ Γ' : Multiset (Formula n)} {A : Formula n}
     (h : ProvableWithin .intuitionistic ⟪Γ ; Γ' ⊢ 0 ; {A}⟫) : LJ (Γ + Γ') A :=
   ljWithin_aux h A (Multiset.mem_singleton_self _)
 
-theorem Formula.IsNeutralInt.isIntuitionistic {A : Formula} (h : A.IsNeutralInt) :
+theorem Formula.IsNeutralInt.isIntuitionistic {A : Formula n} (h : A.IsNeutralInt) :
     A.IsIntuitionistic := by
   induction A with
   | atom p ts => simp_all [IsNeutralInt, IsIntuitionistic]
@@ -263,15 +265,15 @@ theorem Formula.IsNeutralInt.isIntuitionistic {A : Formula} (h : A.IsNeutralInt)
   | _ => exact h.elim
 
 /-- The same for the neutral intuitionistic fragment. -/
-theorem LJ.of_provableWithin_neutralInt {Γ Γ' : Multiset Formula} {A : Formula}
+theorem LJ.of_provableWithin_neutralInt {Γ Γ' : Multiset (Formula n)} {A : Formula n}
     (h : ProvableWithin .neutralIntuitionistic ⟪Γ ; Γ' ⊢ 0 ; {A}⟫) : LJ (Γ + Γ') A := by
   refine LJ.of_provableWithin_intuitionistic (h.mono (fun _ _ h => h) fun S hS => ?_)
   exact ⟨fun B hB => (hS.1 B hB).isIntuitionistic, hS.2.1, hS.2.2.1⟩
 
 /-- Every intuitionistic sequent provable in LU (cuts allowed) translates to an LJ-provable
 sequent, assuming cut elimination for LU (as the Theorem of §6 with cuts does). -/
-theorem LJ.of_provable_intuitionistic (hce : CutElimination) {Γ Γ' : Multiset Formula}
-    {A : Formula} (hS : IntSeq ⟪Γ ; Γ' ⊢ 0 ; {A}⟫) (h : Provable ⟪Γ ; Γ' ⊢ 0 ; {A}⟫) :
+theorem LJ.of_provable_intuitionistic (hce : CutElimination) {Γ Γ' : Multiset (Formula n)}
+    {A : Formula n} (hS : IntSeq ⟪Γ ; Γ' ⊢ 0 ; {A}⟫) (h : Provable ⟪Γ ; Γ' ⊢ 0 ; {A}⟫) :
     LJ (Γ + Γ') A :=
   LJ.of_provableWithin_intuitionistic
     (fragment_theorem_of_cutElimination hce .intuitionistic hS h)
@@ -296,29 +298,29 @@ theorem Provable.rule2 {p q c : Sequent} (hr : Rule [p, q] c) (hp : Provable p)
 theorem Provable.congr {S T : Sequent} (h : Provable S) (e : S = T) : Provable T := e ▸ h
 
 /-- Weakening in the left central zone by a whole multiset. -/
-theorem Provable.weakCL {Γ Γ' Δ' Δ : Multiset Formula} (h : Provable ⟪Γ ; Γ' ⊢ Δ' ; Δ⟫) :
-    ∀ E : Multiset Formula, Provable ⟪Γ ; E + Γ' ⊢ Δ' ; Δ⟫ := by
+theorem Provable.weakCL {Γ Γ' Δ' Δ : Multiset (Formula n)} (h : Provable ⟪Γ ; Γ' ⊢ Δ' ; Δ⟫) :
+    ∀ E : Multiset (Formula n), Provable ⟪Γ ; E + Γ' ⊢ Δ' ; Δ⟫ := by
   intro E
   induction E using Multiset.induction_on with
   | empty => simpa using h
   | cons A E ih => rw [Multiset.cons_add]; exact .rule1 (Rule.weakL _ _ _ _ A) ih
 
-theorem Provable.weakCL_le {Γ Γ' Γ'' Δ' Δ : Multiset Formula}
+theorem Provable.weakCL_le {Γ Γ' Γ'' Δ' Δ : Multiset (Formula n)}
     (h : Provable ⟪Γ ; Γ' ⊢ Δ' ; Δ⟫) (hle : Γ' ≤ Γ'') : Provable ⟪Γ ; Γ'' ⊢ Δ' ; Δ⟫ := by
   obtain ⟨E, rfl⟩ := Multiset.le_iff_exists_add.1 hle
   simpa [add_comm] using h.weakCL E
 
 /-- Identity with the formula in the central zone: `;A ⊢ ;A`. -/
-theorem Provable.axC (A : Formula) : Provable ⟪0 ; {A} ⊢ 0 ; {A}⟫ :=
+theorem Provable.axC (A : Formula n) : Provable ⟪0 ; {A} ⊢ 0 ; {A}⟫ :=
   .rule1 (Rule.inL 0 0 0 {A} A) (.rule (Rule.ax A) (by simp))
 
 /-- A positive formula in the central zone may be moved to the linear zone (`outL`). -/
-theorem Provable.outL' {Γ Γ' Δ' Δ : Multiset Formula} {P : Formula} (hP : P.pol = .pos)
+theorem Provable.outL' {Γ Γ' Δ' Δ : Multiset (Formula n)} {P : Formula n} (hP : P.pol = .pos)
     (h : Provable ⟪Γ ; P ::ₘ Γ' ⊢ Δ' ; Δ⟫) : Provable ⟪P ::ₘ Γ ; Γ' ⊢ Δ' ; Δ⟫ :=
   .rule1 (Rule.outL _ _ _ _ P hP) h
 
 /-- Using a projection `B;⊢;A` provable in LU: if `;A, Γ ⊢ ;C` then `;B, Γ ⊢ ;C`. -/
-theorem Provable.useProj {B A C : Formula} {Γ : Multiset Formula}
+theorem Provable.useProj {B A C : Formula n} {Γ : Multiset (Formula n)}
     (hBA : Provable ⟪{B} ; 0 ⊢ 0 ; {A}⟫) (h : Provable ⟪0 ; A ::ₘ Γ ⊢ 0 ; {C}⟫) :
     Provable ⟪0 ; B ::ₘ Γ ⊢ 0 ; {C}⟫ := by
   have h1 : Provable ⟪0 ; B ::ₘ Γ ⊢ 0 ; {A}⟫ :=
@@ -327,29 +329,29 @@ theorem Provable.useProj {B A C : Formula} {Γ : Multiset Formula}
     h.weakCL_le (Multiset.cons_le_cons _ (Multiset.le_cons_self _ _))
   exact .cutRule (CutRule.cutL 0 (B ::ₘ Γ) 0 {C} A) (by simp [h1, h2])
 
-theorem pol_pos_or_neu {A : Formula} (h : A.IsIntuitionistic) : A.pol = .pos ∨ A.pol = .neu := by
+theorem pol_pos_or_neu {A : Formula n} (h : A.IsIntuitionistic) : A.pol = .pos ∨ A.pol = .neu := by
   have := h.pol_ne_neg
   cases hA : A.pol <;> simp_all
 
 /-- Weakening of a positive formula in the linear left zone. -/
-theorem Provable.weakPos {Γ Γ' Δ' Δ : Multiset Formula} {P : Formula} (hP : P.pol = .pos)
+theorem Provable.weakPos {Γ Γ' Δ' Δ : Multiset (Formula n)} {P : Formula n} (hP : P.pol = .pos)
     (h : Provable ⟪Γ ; Γ' ⊢ Δ' ; Δ⟫) : Provable ⟪P ::ₘ Γ ; Γ' ⊢ Δ' ; Δ⟫ :=
   .outL' hP (.rule1 (Rule.weakL _ _ _ _ P) h)
 
-theorem proj_conj₁ {A B : Formula} (hA : A.IsIntuitionistic) (hB : B.IsIntuitionistic) :
+theorem proj_conj₁ {A B : Formula n} (hA : A.IsIntuitionistic) (hB : B.IsIntuitionistic) :
     Provable ⟪{conj A B} ; 0 ⊢ 0 ; {A}⟫ := by
   have ax := Provable.rule (Rule.ax A) (by simp)
   rcases pol_pos_or_neu hA with hpA | hpA <;> rcases pol_pos_or_neu hB with hpB | hpB
   · exact .rule1 (Rule.conjL_PQ 0 0 0 {A} A B hpA hpB)
       ((Provable.weakPos hpB ax).congr (by
-        rw [Sequent.mk.injEq]; exact ⟨Multiset.cons_swap B A 0, rfl, rfl, rfl⟩))
+        rw [Sequent.mk_inj]; exact ⟨Multiset.cons_swap B A 0, rfl, rfl, rfl⟩))
   · exact .rule1 (Rule.conjL_PB 0 0 0 {A} A B hpA (by simp [hpB]))
       (.rule1 (Rule.weakL _ _ _ _ B) ax)
   · exact .rule1 (Rule.conjL_AQ 0 0 0 {A} A B (by simp [hpA]) hpB)
       (Provable.weakPos hpB (by simpa using Provable.axC A))
   · exact .rule1 (Rule.conjL_AB₁ 0 0 0 {A} A B (by simp [hpA]) (by simp [hpB])) ax
 
-theorem proj_conj₂ {A B : Formula} (hA : A.IsIntuitionistic) (hB : B.IsIntuitionistic) :
+theorem proj_conj₂ {A B : Formula n} (hA : A.IsIntuitionistic) (hB : B.IsIntuitionistic) :
     Provable ⟪{conj A B} ; 0 ⊢ 0 ; {B}⟫ := by
   have ax := Provable.rule (Rule.ax B) (by simp)
   rcases pol_pos_or_neu hA with hpA | hpA <;> rcases pol_pos_or_neu hB with hpB | hpB
@@ -360,11 +362,11 @@ theorem proj_conj₂ {A B : Formula} (hA : A.IsIntuitionistic) (hB : B.IsIntuiti
       (.rule1 (Rule.weakL _ _ _ _ A) ax)
   · exact .rule1 (Rule.conjL_AB₂ 0 0 0 {B} A B (by simp [hpA]) (by simp [hpB])) ax
 
-theorem proj_lall (A : Formula) (t : Term) : Provable ⟪{lall A} ; 0 ⊢ 0 ; {A.inst t}⟫ :=
+theorem proj_lall (A : Formula (n + 1)) (t : Term n) : Provable ⟪{lall A} ; 0 ⊢ 0 ; {A.inst t}⟫ :=
   .rule1 (Rule.lallL 0 0 0 {A.inst t} A t) (.rule (Rule.ax _) (by simp))
 
 /-- `A ⊃ B; ⊢ ;B` from `;Γ ⊢ ;A`, with `Γ` in the central zone. -/
-theorem proj_iimp {A B : Formula} {Γ : Multiset Formula} (hA : A.IsIntuitionistic)
+theorem proj_iimp {A B : Formula n} {Γ : Multiset (Formula n)} (hA : A.IsIntuitionistic)
     (h : Provable ⟪0 ; Γ ⊢ 0 ; {A}⟫) : Provable ⟪{iimp A B} ; Γ ⊢ 0 ; {B}⟫ := by
   have axB : Provable ⟪{B} ; Γ ⊢ 0 ; {B}⟫ :=
     (Provable.rule (Rule.ax B) (by simp)).weakCL_le (Multiset.zero_le _)
@@ -373,11 +375,11 @@ theorem proj_iimp {A B : Formula} {Γ : Multiset Formula} (hA : A.IsIntuitionist
       (by simpa using axB)).congr (by simp)
   · exact Provable.rule2 (Rule.iimpL_A 0 Γ 0 {B} A B (by simp [hpA])) h axB
 
-theorem sh_zero : sh 0 = 0 := Multiset.map_zero _
+theorem sh_zero : sh (0 : Multiset (Formula n)) = 0 := Multiset.map_zero _
 
 /-- **From LJ to LU** (end of §6, item 1, "the other way around"): an LJ-provable sequent
 `Γ ⊢ C` of intuitionistic formulas is provable in LU (with cut) as `;Γ ⊢ ;C`. -/
-theorem LJ.provable {Γ : Multiset Formula} {C : Formula} (h : LJ Γ C)
+theorem LJ.provable {Γ : Multiset (Formula n)} {C : Formula n} (h : LJ Γ C)
     (hΓ : ∀ A ∈ Γ, A.IsIntuitionistic) (hC : C.IsIntuitionistic) :
     Provable ⟪0 ; Γ ⊢ 0 ; {C}⟫ := by
   induction h with

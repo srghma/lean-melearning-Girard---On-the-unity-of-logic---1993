@@ -36,11 +36,11 @@ namespace LU
 
 open Formula
 
-/-- A positive nullary atom `q`. -/
-def atQ : Formula := atom ⟨0, 0, .pos⟩ []
+/-- A positive nullary atom `q` (a closed formula). -/
+def atQ : Formula 0 := atom ⟨0, 0, .pos⟩ Fin.elim0
 
-/-- A second positive nullary atom `q'`. -/
-def atQ' : Formula := atom ⟨1, 0, .pos⟩ []
+/-- A second positive nullary atom `q'` (a closed formula). -/
+def atQ' : Formula 0 := atom ⟨1, 0, .pos⟩ Fin.elim0
 
 /-- Left premise `; ⊢ ; ¬q, q`. -/
 def multPrem1 : Sequent := ⟪0 ; 0 ⊢ 0 ; neg atQ ::ₘ {atQ}⟫

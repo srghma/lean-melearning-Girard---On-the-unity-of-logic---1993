@@ -32,7 +32,11 @@ Status:
   down explicitly)") is **not** proved; it is the only `sorry` in the development, and
   `fragment_theorem` (the statement with cuts) depends on it.
 
-Transcription choices: sequents are quadruples of multisets (exchange built in); bound
-variables use de Bruijn indices (eigenvariable conditions = shifting the context); the
+Transcription choices: syntax is well-scoped by construction — `Term n` and `Formula n` have
+their free variables in `Fin n` (de Bruijn indices; `Formula 0` = closed formulas), function
+and predicate symbols always receive exactly `arity` arguments (`Fin arity → Term n`), and
+quantifier bodies live in `Formula (n + 1)`; a `Sequent` records its scope and its four zones
+are multisets of `Formula scope` (exchange built in); eigenvariable conditions hold by
+construction (the premise lives in scope `n + 1`, its context is the weakened context); the
 misprinted left rule for `N ⇒ P` (Fig. 3) is taken to be the additive left rule of `N⊥ ⊕ P`
 (Table 3); as in the paper, classical-implication rules with neutral arguments are omitted.

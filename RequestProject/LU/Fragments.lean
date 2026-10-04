@@ -32,12 +32,14 @@ In every case all the formulas of the sequent must belong to the fragment.
 
 namespace LU
 
+variable {n : ℕ}
+
 open Formula
 
 namespace Formula
 
 /-- Formulas of the classical fragment. -/
-def IsClassical : Formula → Prop
+def IsClassical {n : ℕ} : Formula n → Prop
   | atom p _ => p.pol ≠ .neu
   | one => True
   | zero => True
@@ -50,7 +52,7 @@ def IsClassical : Formula → Prop
   | _ => False
 
 /-- Formulas of the intuitionistic fragment. -/
-def IsIntuitionistic : Formula → Prop
+def IsIntuitionistic {n : ℕ} : Formula n → Prop
   | atom p _ => p.pol ≠ .neg
   | one => True
   | zero => True
@@ -62,7 +64,7 @@ def IsIntuitionistic : Formula → Prop
   | _ => False
 
 /-- Formulas of the neutral intuitionistic fragment. -/
-def IsNeutralInt : Formula → Prop
+def IsNeutralInt {n : ℕ} : Formula n → Prop
   | atom p _ => p.pol = .neu
   | conj A B => A.IsNeutralInt ∧ B.IsNeutralInt
   | iimp A B => A.IsNeutralInt ∧ B.IsNeutralInt
@@ -70,7 +72,7 @@ def IsNeutralInt : Formula → Prop
   | _ => False
 
 /-- Formulas of the linear fragment. -/
-def IsLinear : Formula → Prop
+def IsLinear {n : ℕ} : Formula n → Prop
   | atom _ _ => True
   | one => True
   | zero => True
@@ -91,7 +93,7 @@ def IsLinear : Formula → Prop
 end Formula
 
 /-- All formulas of a sequent satisfy `F`. -/
-def AllIn (F : Formula → Prop) (S : Sequent) : Prop := ∀ A ∈ S.formulas, F A
+def AllIn (F : ∀ {n : ℕ}, Formula n → Prop) (S : Sequent) : Prop := ∀ A ∈ S.formulas, F A
 
 /-- `μ(S)`: the number of negative formulas in `Γ` plus the number of positive formulas
 in `Δ`, for `S = Γ;Γ' ⊢ Δ';Δ`. -/

@@ -10,6 +10,8 @@ public import RequestProject.LU.Classical
 
 namespace LU
 
+variable {n : ℕ}
+
 open Formula
 
 attribute [local simp] Formula.pol Pol.conj Pol.disj Pol.imp Pol.dual mu_mk Multiset.le_cons_self
@@ -22,7 +24,7 @@ set_option maxHeartbeats 4000000 in
 theorem Rule.clGood {ps : List Sequent} {c : Sequent} (hr : Rule ps c) (hc : ClShape c)
     (hpre : ∀ p ∈ ps, ClShape p) (ih : ∀ p ∈ ps, ClGood p) : ClGood c := by
   have hr' := hr
-  have hneu : ∀ A : Formula, A.IsClassical → A.pol ≠ .neu := fun A h => h.pol_ne_neu
+  have hneu : ∀ {n : ℕ} (A : Formula n), A.IsClassical → A.pol ≠ .neu := fun A h => h.pol_ne_neu
   cases hr
   case ax A => exact cl_absorb hr' hc ih (by simp) (fun h => by
       simp only [mu_mk, muL_singleton, muR_singleton] at h; split_ifs at h <;> simp_all)

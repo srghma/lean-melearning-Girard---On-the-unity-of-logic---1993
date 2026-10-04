@@ -31,81 +31,84 @@ in LL).
 
 namespace LU
 
+variable {n : ℕ}
+
 open Formula
 
 /-- The usual two-sided sequent calculus of first-order linear logic (Girard 1987).
 `LL b Γ Δ` means that `Γ ⊢ Δ` is provable; the cut rule may only be used if `b = true`.
-The eigenvariable conditions are expressed by shifting the contexts, as in LU. -/
-inductive LL (b : Bool) : Multiset Formula → Multiset Formula → Prop where
-  | ax (A : Formula) : LL b {A} {A}
-  | cut {Γ Λ Δ Θ : Multiset Formula} (A : Formula) (hb : b = true) :
+The eigenvariable conditions hold by construction, as in LU: the premise lives in the scope
+`n + 1` and its context is the weakening of the conclusion's context. -/
+inductive LL (b : Bool) : {n : ℕ} → Multiset (Formula n) → Multiset (Formula n) → Prop where
+  | ax {n : ℕ} (A : Formula n) : LL b {A} {A}
+  | cut {n : ℕ} {Γ Λ Δ Θ : Multiset (Formula n)} (A : Formula n) (hb : b = true) :
       LL b Γ (A ::ₘ Δ) → LL b (A ::ₘ Λ) Θ → LL b (Γ + Λ) (Δ + Θ)
-  | oneR : LL b 0 {one}
-  | oneL {Γ Δ : Multiset Formula} : LL b Γ Δ → LL b (one ::ₘ Γ) Δ
-  | botL : LL b {bot} 0
-  | botR {Γ Δ : Multiset Formula} : LL b Γ Δ → LL b Γ (bot ::ₘ Δ)
-  | topR (Γ Δ : Multiset Formula) : LL b Γ (top ::ₘ Δ)
-  | zeroL (Γ Δ : Multiset Formula) : LL b (zero ::ₘ Γ) Δ
-  | tensorR {Γ Λ Δ Θ : Multiset Formula} {A B : Formula} :
+  | oneR {n : ℕ} : LL b 0 {(one : Formula n)}
+  | oneL {n : ℕ} {Γ Δ : Multiset (Formula n)} : LL b Γ Δ → LL b (one ::ₘ Γ) Δ
+  | botL {n : ℕ} : LL b {(bot : Formula n)} 0
+  | botR {n : ℕ} {Γ Δ : Multiset (Formula n)} : LL b Γ Δ → LL b Γ (bot ::ₘ Δ)
+  | topR {n : ℕ} (Γ Δ : Multiset (Formula n)) : LL b Γ (top ::ₘ Δ)
+  | zeroL {n : ℕ} (Γ Δ : Multiset (Formula n)) : LL b (zero ::ₘ Γ) Δ
+  | tensorR {n : ℕ} {Γ Λ Δ Θ : Multiset (Formula n)} {A B : Formula n} :
       LL b Γ (A ::ₘ Δ) → LL b Λ (B ::ₘ Θ) → LL b (Γ + Λ) (tensor A B ::ₘ (Δ + Θ))
-  | tensorL {Γ Δ : Multiset Formula} {A B : Formula} :
+  | tensorL {n : ℕ} {Γ Δ : Multiset (Formula n)} {A B : Formula n} :
       LL b (A ::ₘ B ::ₘ Γ) Δ → LL b (tensor A B ::ₘ Γ) Δ
-  | parR {Γ Δ : Multiset Formula} {A B : Formula} :
+  | parR {n : ℕ} {Γ Δ : Multiset (Formula n)} {A B : Formula n} :
       LL b Γ (A ::ₘ B ::ₘ Δ) → LL b Γ (par A B ::ₘ Δ)
-  | parL {Γ Λ Δ Θ : Multiset Formula} {A B : Formula} :
+  | parL {n : ℕ} {Γ Λ Δ Θ : Multiset (Formula n)} {A B : Formula n} :
       LL b (A ::ₘ Γ) Δ → LL b (B ::ₘ Λ) Θ → LL b (par A B ::ₘ (Γ + Λ)) (Δ + Θ)
-  | lolliR {Γ Δ : Multiset Formula} {A B : Formula} :
+  | lolliR {n : ℕ} {Γ Δ : Multiset (Formula n)} {A B : Formula n} :
       LL b (A ::ₘ Γ) (B ::ₘ Δ) → LL b Γ (lolli A B ::ₘ Δ)
-  | lolliL {Γ Λ Δ Θ : Multiset Formula} {A B : Formula} :
+  | lolliL {n : ℕ} {Γ Λ Δ Θ : Multiset (Formula n)} {A B : Formula n} :
       LL b Γ (A ::ₘ Δ) → LL b (B ::ₘ Λ) Θ → LL b (lolli A B ::ₘ (Γ + Λ)) (Δ + Θ)
-  | withR {Γ Δ : Multiset Formula} {A B : Formula} :
+  | withR {n : ℕ} {Γ Δ : Multiset (Formula n)} {A B : Formula n} :
       LL b Γ (A ::ₘ Δ) → LL b Γ (B ::ₘ Δ) → LL b Γ (with_ A B ::ₘ Δ)
-  | withL₁ {Γ Δ : Multiset Formula} {A : Formula} (B : Formula) :
+  | withL₁ {n : ℕ} {Γ Δ : Multiset (Formula n)} {A : Formula n} (B : Formula n) :
       LL b (A ::ₘ Γ) Δ → LL b (with_ A B ::ₘ Γ) Δ
-  | withL₂ {Γ Δ : Multiset Formula} (A : Formula) {B : Formula} :
+  | withL₂ {n : ℕ} {Γ Δ : Multiset (Formula n)} (A : Formula n) {B : Formula n} :
       LL b (B ::ₘ Γ) Δ → LL b (with_ A B ::ₘ Γ) Δ
-  | plusR₁ {Γ Δ : Multiset Formula} {A : Formula} (B : Formula) :
+  | plusR₁ {n : ℕ} {Γ Δ : Multiset (Formula n)} {A : Formula n} (B : Formula n) :
       LL b Γ (A ::ₘ Δ) → LL b Γ (plus A B ::ₘ Δ)
-  | plusR₂ {Γ Δ : Multiset Formula} (A : Formula) {B : Formula} :
+  | plusR₂ {n : ℕ} {Γ Δ : Multiset (Formula n)} (A : Formula n) {B : Formula n} :
       LL b Γ (B ::ₘ Δ) → LL b Γ (plus A B ::ₘ Δ)
-  | plusL {Γ Δ : Multiset Formula} {A B : Formula} :
+  | plusL {n : ℕ} {Γ Δ : Multiset (Formula n)} {A B : Formula n} :
       LL b (A ::ₘ Γ) Δ → LL b (B ::ₘ Γ) Δ → LL b (plus A B ::ₘ Γ) Δ
-  | negL {Γ Δ : Multiset Formula} {A : Formula} : LL b Γ (A ::ₘ Δ) → LL b (neg A ::ₘ Γ) Δ
-  | negR {Γ Δ : Multiset Formula} {A : Formula} : LL b (A ::ₘ Γ) Δ → LL b Γ (neg A ::ₘ Δ)
+  | negL {n : ℕ} {Γ Δ : Multiset (Formula n)} {A : Formula n} : LL b Γ (A ::ₘ Δ) → LL b (neg A ::ₘ Γ) Δ
+  | negR {n : ℕ} {Γ Δ : Multiset (Formula n)} {A : Formula n} : LL b (A ::ₘ Γ) Δ → LL b Γ (neg A ::ₘ Δ)
   /-- promotion: `!Γ ⊢ A, ?Δ / !Γ ⊢ !A, ?Δ` -/
-  | bangR {Γ Δ : Multiset Formula} {A : Formula} :
+  | bangR {n : ℕ} {Γ Δ : Multiset (Formula n)} {A : Formula n} :
       LL b (Γ.map bang) (A ::ₘ Δ.map quest) → LL b (Γ.map bang) (bang A ::ₘ Δ.map quest)
   /-- dereliction (left) -/
-  | bangD {Γ Δ : Multiset Formula} {A : Formula} : LL b (A ::ₘ Γ) Δ → LL b (bang A ::ₘ Γ) Δ
+  | bangD {n : ℕ} {Γ Δ : Multiset (Formula n)} {A : Formula n} : LL b (A ::ₘ Γ) Δ → LL b (bang A ::ₘ Γ) Δ
   /-- weakening (left) -/
-  | bangW {Γ Δ : Multiset Formula} (A : Formula) : LL b Γ Δ → LL b (bang A ::ₘ Γ) Δ
+  | bangW {n : ℕ} {Γ Δ : Multiset (Formula n)} (A : Formula n) : LL b Γ Δ → LL b (bang A ::ₘ Γ) Δ
   /-- contraction (left) -/
-  | bangC {Γ Δ : Multiset Formula} {A : Formula} :
+  | bangC {n : ℕ} {Γ Δ : Multiset (Formula n)} {A : Formula n} :
       LL b (bang A ::ₘ bang A ::ₘ Γ) Δ → LL b (bang A ::ₘ Γ) Δ
   /-- `?`-left: `A, !Γ ⊢ ?Δ / ?A, !Γ ⊢ ?Δ` -/
-  | questL {Γ Δ : Multiset Formula} {A : Formula} :
+  | questL {n : ℕ} {Γ Δ : Multiset (Formula n)} {A : Formula n} :
       LL b (A ::ₘ Γ.map bang) (Δ.map quest) → LL b (quest A ::ₘ Γ.map bang) (Δ.map quest)
   /-- dereliction (right) -/
-  | questD {Γ Δ : Multiset Formula} {A : Formula} : LL b Γ (A ::ₘ Δ) → LL b Γ (quest A ::ₘ Δ)
+  | questD {n : ℕ} {Γ Δ : Multiset (Formula n)} {A : Formula n} : LL b Γ (A ::ₘ Δ) → LL b Γ (quest A ::ₘ Δ)
   /-- weakening (right) -/
-  | questW {Γ Δ : Multiset Formula} (A : Formula) : LL b Γ Δ → LL b Γ (quest A ::ₘ Δ)
+  | questW {n : ℕ} {Γ Δ : Multiset (Formula n)} (A : Formula n) : LL b Γ Δ → LL b Γ (quest A ::ₘ Δ)
   /-- contraction (right) -/
-  | questC {Γ Δ : Multiset Formula} {A : Formula} :
+  | questC {n : ℕ} {Γ Δ : Multiset (Formula n)} {A : Formula n} :
       LL b Γ (quest A ::ₘ quest A ::ₘ Δ) → LL b Γ (quest A ::ₘ Δ)
-  | lallR {Γ Δ : Multiset Formula} {A : Formula} : LL b (sh Γ) (A ::ₘ sh Δ) → LL b Γ (lall A ::ₘ Δ)
-  | lallL {Γ Δ : Multiset Formula} {A : Formula} (t : Term) :
+  | lallR {n : ℕ} {Γ Δ : Multiset (Formula n)} {A : Formula (n + 1)} : LL b (sh Γ) (A ::ₘ sh Δ) → LL b Γ (lall A ::ₘ Δ)
+  | lallL {n : ℕ} {Γ Δ : Multiset (Formula n)} {A : Formula (n + 1)} (t : Term n) :
       LL b (A.inst t ::ₘ Γ) Δ → LL b (lall A ::ₘ Γ) Δ
-  | lexR {Γ Δ : Multiset Formula} {A : Formula} (t : Term) :
+  | lexR {n : ℕ} {Γ Δ : Multiset (Formula n)} {A : Formula (n + 1)} (t : Term n) :
       LL b Γ (A.inst t ::ₘ Δ) → LL b Γ (lex A ::ₘ Δ)
-  | lexL {Γ Δ : Multiset Formula} {A : Formula} : LL b (A ::ₘ sh Γ) (sh Δ) → LL b (lex A ::ₘ Γ) Δ
+  | lexL {n : ℕ} {Γ Δ : Multiset (Formula n)} {A : Formula (n + 1)} : LL b (A ::ₘ sh Γ) (sh Δ) → LL b (lex A ::ₘ Γ) Δ
 
 namespace LL
 
-theorem congr {b : Bool} {Γ Γ₁ Δ Δ₁ : Multiset Formula} (h : LL b Γ Δ) (e₁ : Γ = Γ₁)
+theorem congr {b : Bool} {Γ Γ₁ Δ Δ₁ : Multiset (Formula n)} (h : LL b Γ Δ) (e₁ : Γ = Γ₁)
     (e₂ : Δ = Δ₁) : LL b Γ₁ Δ₁ := e₁ ▸ e₂ ▸ h
 
 /-- A cut-free LL derivation is in particular an LL derivation. -/
-theorem withCut {b : Bool} {Γ Δ : Multiset Formula} (h : LL b Γ Δ) : LL true Γ Δ := by
+theorem withCut {b : Bool} {Γ Δ : Multiset (Formula n)} (h : LL b Γ Δ) : LL true Γ Δ := by
   induction h with
   | ax A => exact .ax A
   | cut A _ _ _ ih₁ ih₂ => exact .cut A rfl ih₁ ih₂
@@ -168,8 +171,8 @@ theorem D_rule2 {p q c : Sequent} (hr : Rule [p, q] c) (hp : D p) (hq : D q) : D
   .mk [p, q] c (hR _ _ hr) trivial (by simp [hp, hq])
 
 /-- Move a multiset of formulas from the left linear zone into the central zone. -/
-theorem D_inL_all (M : Multiset Formula) :
-    ∀ {Γ Γ' Δ' Δ : Multiset Formula}, D ⟪M + Γ ; Γ' ⊢ Δ' ; Δ⟫ → D ⟪Γ ; M + Γ' ⊢ Δ' ; Δ⟫ := by
+theorem D_inL_all (M : Multiset (Formula n)) :
+    ∀ {Γ Γ' Δ' Δ : Multiset (Formula n)}, D ⟪M + Γ ; Γ' ⊢ Δ' ; Δ⟫ → D ⟪Γ ; M + Γ' ⊢ Δ' ; Δ⟫ := by
   induction M using Multiset.induction_on with
   | empty => intro Γ Γ' Δ' Δ h; simpa using h
   | cons a M ih =>
@@ -179,8 +182,8 @@ theorem D_inL_all (M : Multiset Formula) :
     exact D_congr (ih h1) (by simp [Multiset.cons_add])
 
 /-- Move a multiset of formulas from the right linear zone into the central zone. -/
-theorem D_inR_all (M : Multiset Formula) :
-    ∀ {Γ Γ' Δ' Δ : Multiset Formula}, D ⟪Γ ; Γ' ⊢ Δ' ; M + Δ⟫ → D ⟪Γ ; Γ' ⊢ M + Δ' ; Δ⟫ := by
+theorem D_inR_all (M : Multiset (Formula n)) :
+    ∀ {Γ Γ' Δ' Δ : Multiset (Formula n)}, D ⟪Γ ; Γ' ⊢ Δ' ; M + Δ⟫ → D ⟪Γ ; Γ' ⊢ M + Δ' ; Δ⟫ := by
   induction M using Multiset.induction_on with
   | empty => intro Γ Γ' Δ' Δ h; simpa using h
   | cons a M ih =>
@@ -190,8 +193,8 @@ theorem D_inR_all (M : Multiset Formula) :
     exact D_congr (ih h1) (by simp [Multiset.cons_add])
 
 /-- Move a multiset of positive formulas from the central zone to the left linear zone. -/
-theorem D_outL_all (M : Multiset Formula) (hM : ∀ P ∈ M, P.pol = .pos) :
-    ∀ {Γ Γ' Δ' Δ : Multiset Formula}, D ⟪Γ ; M + Γ' ⊢ Δ' ; Δ⟫ → D ⟪M + Γ ; Γ' ⊢ Δ' ; Δ⟫ := by
+theorem D_outL_all (M : Multiset (Formula n)) (hM : ∀ P ∈ M, P.pol = .pos) :
+    ∀ {Γ Γ' Δ' Δ : Multiset (Formula n)}, D ⟪Γ ; M + Γ' ⊢ Δ' ; Δ⟫ → D ⟪M + Γ ; Γ' ⊢ Δ' ; Δ⟫ := by
   induction M using Multiset.induction_on with
   | empty => intro Γ Γ' Δ' Δ h; simpa using h
   | cons a M ih =>
@@ -203,8 +206,8 @@ theorem D_outL_all (M : Multiset Formula) (hM : ∀ P ∈ M, P.pol = .pos) :
       (by simp [Multiset.cons_add])
 
 /-- Move a multiset of negative formulas from the central zone to the right linear zone. -/
-theorem D_outR_all (M : Multiset Formula) (hM : ∀ N ∈ M, N.pol = .neg) :
-    ∀ {Γ Γ' Δ' Δ : Multiset Formula}, D ⟪Γ ; Γ' ⊢ M + Δ' ; Δ⟫ → D ⟪Γ ; Γ' ⊢ Δ' ; M + Δ⟫ := by
+theorem D_outR_all (M : Multiset (Formula n)) (hM : ∀ N ∈ M, N.pol = .neg) :
+    ∀ {Γ Γ' Δ' Δ : Multiset (Formula n)}, D ⟪Γ ; Γ' ⊢ M + Δ' ; Δ⟫ → D ⟪Γ ; Γ' ⊢ Δ' ; M + Δ⟫ := by
   induction M using Multiset.induction_on with
   | empty => intro Γ Γ' Δ' Δ h; simpa using h
   | cons a M ih =>
@@ -216,18 +219,18 @@ theorem D_outR_all (M : Multiset Formula) (hM : ∀ N ∈ M, N.pol = .neg) :
       (by simp [Multiset.cons_add])
 
 omit hR in
-theorem pol_bang_mem {Γ : Multiset Formula} : ∀ P ∈ Γ.map bang, P.pol = .pos := by
+theorem pol_bang_mem {Γ : Multiset (Formula n)} : ∀ P ∈ Γ.map bang, P.pol = .pos := by
   intro P hP; obtain ⟨A, -, rfl⟩ := Multiset.mem_map.1 hP; rfl
 
 omit hR in
-theorem pol_quest_mem {Δ : Multiset Formula} : ∀ N ∈ Δ.map quest, N.pol = .neg := by
+theorem pol_quest_mem {Δ : Multiset (Formula n)} : ∀ N ∈ Δ.map quest, N.pol = .neg := by
   intro N hN; obtain ⟨A, -, rfl⟩ := Multiset.mem_map.1 hN; rfl
 
 /-- **Translation of LL into LU** (§4).  An LL derivation of `Γ ⊢ Δ` gives an LU derivation
 of `Γ; ⊢ ;Δ` using the rules `R`, provided `R` contains the rules of LU and, if the LL
 derivation may use cuts, the cut rules. -/
 theorem LL.toLU {b : Bool} (hC : b = true → ∀ ps c, CutRule ps c → R ps c)
-    {Γ Δ : Multiset Formula} (h : LL b Γ Δ) : D ⟪Γ ; 0 ⊢ 0 ; Δ⟫ := by
+    {Γ Δ : Multiset (Formula n)} (h : LL b Γ Δ) : D ⟪Γ ; 0 ⊢ 0 ; Δ⟫ := by
   induction h with
   | ax A => exact D_rule0 hR (Rule.ax A)
   | cut A hb _ _ ih₁ ih₂ =>
@@ -254,7 +257,7 @@ theorem LL.toLU {b : Bool} (hC : b = true → ∀ ps c, CutRule ps c → R ps c)
   | plusL _ _ ih₁ ih₂ => exact D_rule2 hR (Rule.plusL _ _ _ _ _ _) ih₁ ih₂
   | negL _ ih => exact D_rule1 hR (Rule.negL _ _ _ _ _) ih
   | negR _ ih => exact D_rule1 hR (Rule.negR _ _ _ _ _) ih
-  | @bangR Γ Δ A _ ih =>
+  | @bangR _ Γ Δ A _ ih =>
     -- `!Γ; ⊢ ;?Δ, A` ⟶ `;!Γ ⊢ ?Δ;A` ⟶ `;!Γ ⊢ ?Δ;!A` ⟶ `!Γ; ⊢ ;?Δ, !A`
     have h1 : D ⟪0 ; Γ.map bang ⊢ 0 ; A ::ₘ Δ.map quest⟫ :=
       D_congr (D_inL_all hR (Γ.map bang) (Γ := 0) (Γ' := 0) (Δ' := 0)
@@ -270,10 +273,10 @@ theorem LL.toLU {b : Bool} (hC : b = true → ∀ ps c, CutRule ps c → R ps c)
     exact D_congr h5 (by simp [← Multiset.singleton_add, add_comm])
   | bangD _ ih => exact D_rule1 hR (Rule.bangL _ _ _ _ _) (D_rule1 hR (Rule.inL _ _ _ _ _) ih)
   | bangW A _ ih => exact D_rule1 hR (Rule.bangL _ _ _ _ _) (D_rule1 hR (Rule.weakL _ _ _ _ A) ih)
-  | @bangC Γ Δ A _ ih =>
+  | @bangC _ Γ Δ A _ ih =>
     have h1 := D_rule1 hR (Rule.inL _ _ _ _ _) (D_rule1 hR (Rule.inL _ _ _ _ _) ih)
     exact D_rule1 hR (Rule.outL _ _ _ _ (bang A) rfl) (D_rule1 hR (Rule.contrL _ _ _ _ _) h1)
-  | @questL Γ Δ A _ ih =>
+  | @questL _ Γ Δ A _ ih =>
     have h1 : D ⟪{A} ; Γ.map bang ⊢ 0 ; Δ.map quest⟫ :=
       D_congr (D_inL_all hR (Γ.map bang) (Γ := {A}) (Γ' := 0) (Δ' := 0) (Δ := Δ.map quest)
         (D_congr ih (by simp [← Multiset.singleton_add, add_comm]))) (by simp)
@@ -288,7 +291,7 @@ theorem LL.toLU {b : Bool} (hC : b = true → ∀ ps c, CutRule ps c → R ps c)
   | questD _ ih => exact D_rule1 hR (Rule.questR _ _ _ _ _) (D_rule1 hR (Rule.inR _ _ _ _ _) ih)
   | questW A _ ih =>
     exact D_rule1 hR (Rule.questR _ _ _ _ _) (D_rule1 hR (Rule.weakR _ _ _ _ A) ih)
-  | @questC Γ Δ A _ ih =>
+  | @questC _ Γ Δ A _ ih =>
     have h1 := D_rule1 hR (Rule.inR _ _ _ _ _) (D_rule1 hR (Rule.inR _ _ _ _ _) ih)
     exact D_rule1 hR (Rule.outR _ _ _ _ (quest A) rfl) (D_rule1 hR (Rule.contrR _ _ _ _ _) h1)
   | lallR _ ih => exact D_rule1 hR (Rule.lallR _ _ _ _ _) (D_congr ih (by simp))
@@ -300,12 +303,12 @@ end ToLU
 
 /-- §4: a sequent `Γ ⊢ Δ` provable in linear logic (with cut) is provable in LU as
 `Γ; ⊢ ;Δ`. -/
-theorem LL.provable {Γ Δ : Multiset Formula} (h : LL true Γ Δ) : Provable ⟪Γ ; 0 ⊢ 0 ; Δ⟫ :=
+theorem LL.provable {Γ Δ : Multiset (Formula n)} (h : LL true Γ Δ) : Provable ⟪Γ ; 0 ⊢ 0 ; Δ⟫ :=
   LL.toLU (fun _ _ h => Or.inl h) (fun _ _ _ h => Or.inr h) h
 
 /-- §4: a sequent `Γ ⊢ Δ` with a cut-free proof in linear logic has a cut-free proof in LU
 as `Γ; ⊢ ;Δ` ("it is easy to translate proof to proof"). -/
-theorem LL.cutFreeProvable {Γ Δ : Multiset Formula} (h : LL false Γ Δ) :
+theorem LL.cutFreeProvable {Γ Δ : Multiset (Formula n)} (h : LL false Γ Δ) :
     CutFreeProvable ⟪Γ ; 0 ⊢ 0 ; Δ⟫ :=
   LL.toLU (fun _ _ h => h) (fun h => absurd h Bool.false_ne_true) h
 

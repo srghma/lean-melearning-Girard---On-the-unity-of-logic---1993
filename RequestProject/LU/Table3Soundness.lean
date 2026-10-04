@@ -25,13 +25,15 @@ same name and arity; neutral atoms are unchanged.  For formulas whose atoms are 
 
 namespace LU
 
+variable {n : ℕ}
+
 open Formula
 
 namespace Formula
 
 /-- Reading of an atom in linear logic: `p ↦ !p₀` if `p` is positive, `p ↦ ?p₀` if `p` is
 negative (`p₀` is `p` declared neutral), and neutral atoms are unchanged. -/
-def atomLL (p : Pred) (ts : List Term) : Formula :=
+def atomLL (p : Pred) (ts : Fin p.arity → Term n) : Formula n :=
   match p.pol with
   | .pos => bang (atom { p with pol := .neu } ts)
   | .neg => quest (atom { p with pol := .neu } ts)
@@ -39,7 +41,7 @@ def atomLL (p : Pred) (ts : List Term) : Formula :=
 
 /-- The translation of LU formulas into linear logic: Table 3 (as `toLinear`), with positive
 atoms read as `!p₀` and negative atoms as `?p₀`. -/
-def toLL : Formula → Formula
+def toLL {n : ℕ} : Formula n → Formula n
   | atom p ts => atomLL p ts
   | one => one
   | zero => zero
@@ -63,7 +65,7 @@ def toLL : Formula → Formula
   | cex A => cexLin A.pol A.toLL
 
 /-- Formulas all of whose atoms are neutral. -/
-def AtomsNeutral : Formula → Prop
+def AtomsNeutral {n : ℕ} : Formula n → Prop
   | atom p _ => p.pol = .neu
   | one | zero | bot | top => True
   | neg A | bang A | quest A | lall A | lex A | call A | cex A => A.AtomsNeutral
@@ -71,13 +73,13 @@ def AtomsNeutral : Formula → Prop
   | iimp A B => A.AtomsNeutral ∧ B.AtomsNeutral
 
 /-- With neutral atoms, the translation is exactly the Table 3 decomposition `toLinear`. -/
-theorem toLL_eq_toLinear {A : Formula} (h : A.AtomsNeutral) : A.toLL = A.toLinear := by
+theorem toLL_eq_toLinear {A : Formula n} (h : A.AtomsNeutral) : A.toLL = A.toLinear := by
   induction A <;> simp_all [AtomsNeutral, toLL, toLinear, atomLL]
 
-theorem pol_atomLL (p : Pred) (ts : List Term) : (atomLL p ts).pol = p.pol := by
+theorem pol_atomLL (p : Pred) (ts : Fin p.arity → Term n) : (atomLL p ts).pol = p.pol := by
   unfold atomLL; split <;> simp_all [pol]
 
-@[simp] theorem pol_toLL (A : Formula) : A.toLL.pol = A.pol := by
+@[simp] theorem pol_toLL (A : Formula n) : A.toLL.pol = A.pol := by
   induction A with
   | atom p ts => exact pol_atomLL p ts
   | conj A B ihA ihB =>
@@ -103,7 +105,7 @@ theorem pol_atomLL (p : Pred) (ts : List Term) : (atomLL p ts).pol = p.pol := by
     cases hA : A.pol <;> simp_all [cexLin, pol, Pol.lex]
   | _ => simp_all [toLL, pol]
 
-theorem isNeutralLinear_toLL (A : Formula) : A.toLL.IsNeutralLinear := by
+theorem isNeutralLinear_toLL (A : Formula n) : A.toLL.IsNeutralLinear := by
   induction A with
   | atom p ts => unfold toLL atomLL; split <;> simp_all [IsNeutralLinear]
   | conj A B ihA ihB =>
@@ -118,62 +120,41 @@ theorem isNeutralLinear_toLL (A : Formula) : A.toLL.IsNeutralLinear := by
   | cex A ihA => simp only [toLL]; cases A.pol <;> simp_all [cexLin, IsNeutralLinear]
   | _ => simp_all [toLL, IsNeutralLinear]
 
-theorem toLL_shiftFrom (c : ℕ) (A : Formula) : (A.shiftFrom c).toLL = A.toLL.shiftFrom c := by
-  induction A generalizing c with
-  | atom p ts => unfold shiftFrom toLL atomLL; split <;> simp [shiftFrom]
+theorem toLL_subst {m : ℕ} (A : Formula n) (σ : Subst n m) :
+    (A.subst σ).toLL = A.toLL.subst σ := by
+  induction A generalizing m with
+  | atom p ts => unfold subst toLL atomLL; split <;> simp [subst]
   | conj A B ihA ihB =>
-    simp only [shiftFrom, toLL, pol_shiftFrom, ihA, ihB]
-    cases A.pol <;> cases B.pol <;> simp [conjLin, shiftFrom]
+    simp only [subst, toLL, pol_subst, ihA, ihB]
+    cases A.pol <;> cases B.pol <;> simp [conjLin, subst]
   | disj A B ihA ihB =>
-    simp only [shiftFrom, toLL, pol_shiftFrom, ihA, ihB]
-    cases A.pol <;> cases B.pol <;> simp [disjLin, shiftFrom]
+    simp only [subst, toLL, pol_subst, ihA, ihB]
+    cases A.pol <;> cases B.pol <;> simp [disjLin, subst]
   | imp A B ihA ihB =>
-    simp only [shiftFrom, toLL, pol_shiftFrom, ihA, ihB]
-    cases A.pol <;> cases B.pol <;> simp [impLin, shiftFrom]
+    simp only [subst, toLL, pol_subst, ihA, ihB]
+    cases A.pol <;> cases B.pol <;> simp [impLin, subst]
   | iimp A B ihA ihB =>
-    simp only [shiftFrom, toLL, pol_shiftFrom, ihA, ihB]
-    cases A.pol <;> simp [iimpLin, shiftFrom]
+    simp only [subst, toLL, pol_subst, ihA, ihB]
+    cases A.pol <;> simp [iimpLin, subst]
   | call A ih =>
-    simp only [shiftFrom, toLL, pol_shiftFrom, ih]; cases A.pol <;> simp [callLin, shiftFrom]
+    simp only [subst, toLL, pol_subst, ih]; cases A.pol <;> simp [callLin, subst]
   | cex A ih =>
-    simp only [shiftFrom, toLL, pol_shiftFrom, ih]; cases A.pol <;> simp [cexLin, shiftFrom]
-  | _ => simp_all [shiftFrom, toLL]
+    simp only [subst, toLL, pol_subst, ih]; cases A.pol <;> simp [cexLin, subst]
+  | _ => simp_all [subst, toLL]
 
-theorem toLL_substAt (k : ℕ) (s : Term) (A : Formula) :
-    (A.substAt k s).toLL = A.toLL.substAt k s := by
-  induction A generalizing k s with
-  | atom p ts => unfold substAt toLL atomLL; split <;> simp [substAt]
-  | conj A B ihA ihB =>
-    simp only [substAt, toLL, pol_substAt, ihA, ihB]
-    cases A.pol <;> cases B.pol <;> simp [conjLin, substAt]
-  | disj A B ihA ihB =>
-    simp only [substAt, toLL, pol_substAt, ihA, ihB]
-    cases A.pol <;> cases B.pol <;> simp [disjLin, substAt]
-  | imp A B ihA ihB =>
-    simp only [substAt, toLL, pol_substAt, ihA, ihB]
-    cases A.pol <;> cases B.pol <;> simp [impLin, substAt]
-  | iimp A B ihA ihB =>
-    simp only [substAt, toLL, pol_substAt, ihA, ihB]
-    cases A.pol <;> simp [iimpLin, substAt]
-  | call A ih =>
-    simp only [substAt, toLL, pol_substAt, ih]; cases A.pol <;> simp [callLin, substAt]
-  | cex A ih =>
-    simp only [substAt, toLL, pol_substAt, ih]; cases A.pol <;> simp [cexLin, substAt]
-  | _ => simp_all [substAt, toLL]
-
-theorem toLL_inst (A : Formula) (t : Term) : (A.inst t).toLL = A.toLL.inst t :=
-  toLL_substAt 0 t A
+theorem toLL_inst (A : Formula (n + 1)) (t : Term n) : (A.inst t).toLL = A.toLL.inst t :=
+  toLL_subst A _
 
 end Formula
 
-theorem map_toLL_sh (Γ : Multiset Formula) : (sh Γ).map toLL = sh (Γ.map toLL) := by
-  simp [sh, Multiset.map_map, Formula.shift, toLL_shiftFrom]
+theorem map_toLL_sh (Γ : Multiset (Formula n)) : (sh Γ).map toLL = sh (Γ.map toLL) := by
+  simp [sh, Multiset.map_map, Formula.shift, toLL_subst]
 
 /-! ## Table 3 for the various polarity cases -/
 
 namespace Formula
 
-variable {a b : Pol} {X Y : Formula}
+variable {a b : Pol} {X Y : Formula n} {Z : Formula (n + 1)}
 
 theorem conjLin_PQ (ha : a = .pos) (hb : b = .pos) : conjLin a b X Y = tensor X Y := by
   subst ha hb; rfl
@@ -186,11 +167,11 @@ theorem conjLin_AB (ha : a ≠ .pos) (hb : b ≠ .pos) : conjLin a b X Y = with_
 theorem iimpLin_P (ha : a = .pos) : iimpLin a X Y = lolli X Y := by subst ha; rfl
 theorem iimpLin_A (ha : a ≠ .pos) : iimpLin a X Y = lolli (bang X) Y := by
   cases a <;> simp_all [iimpLin]
-theorem callLin_N (ha : a = .neg) : callLin a X = lall X := by subst ha; rfl
-theorem callLin_A (ha : a ≠ .neg) : callLin a X = lall (quest X) := by
+theorem callLin_N (ha : a = .neg) : callLin a Z = lall Z := by subst ha; rfl
+theorem callLin_A (ha : a ≠ .neg) : callLin a Z = lall (quest Z) := by
   cases a <;> simp_all [callLin]
-theorem cexLin_P (ha : a = .pos) : cexLin a X = lex X := by subst ha; rfl
-theorem cexLin_A (ha : a ≠ .pos) : cexLin a X = lex (bang X) := by
+theorem cexLin_P (ha : a = .pos) : cexLin a Z = lex Z := by subst ha; rfl
+theorem cexLin_A (ha : a ≠ .pos) : cexLin a Z = lex (bang Z) := by
   cases a <;> simp_all [cexLin]
 
 end Formula
@@ -198,11 +179,11 @@ end Formula
 /-! ## Soundness -/
 
 /-- Translation of a context. -/
-abbrev tL (Γ : Multiset Formula) : Multiset Formula := Γ.map toLL
+abbrev tL (Γ : Multiset (Formula n)) : Multiset (Formula n) := Γ.map toLL
 /-- Translation of a left central context: `!Γ*`. -/
-abbrev bL (Γ : Multiset Formula) : Multiset Formula := (Γ.map toLL).map bang
+abbrev bL (Γ : Multiset (Formula n)) : Multiset (Formula n) := (Γ.map toLL).map bang
 /-- Translation of a right central context: `?Δ*`. -/
-abbrev qL (Δ : Multiset Formula) : Multiset Formula := (Δ.map toLL).map quest
+abbrev qL (Δ : Multiset (Formula n)) : Multiset (Formula n) := (Δ.map toLL).map quest
 
 /-- Close an equation between translated multisets. -/
 local macro "mset_tac3" : tactic => `(tactic| ((try simp only [← Multiset.singleton_add,
@@ -222,13 +203,13 @@ local macro "llc " h:term : term => `(LL.congr $h (by mset_tac3) (by mset_tac3))
 local macro "llcw " e:term:max h:term:max : term =>
   `(LL.congr $h (by mset_tac3w $e) (by mset_tac3w $e))
 
-theorem pos_toLL {A : Formula} (h : A.pol = .pos) : LL true {A.toLL} {bang A.toLL} :=
+theorem pos_toLL {A : Formula n} (h : A.pol = .pos) : LL true {A.toLL} {bang A.toLL} :=
   (isNeutralLinear_toLL A).bang_quest.1 (by rw [pol_toLL]; exact h)
 
-theorem neg_toLL {A : Formula} (h : A.pol = .neg) : LL true {quest A.toLL} {A.toLL} :=
+theorem neg_toLL {A : Formula n} (h : A.pol = .neg) : LL true {quest A.toLL} {A.toLL} :=
   (isNeutralLinear_toLL A).bang_quest.2 (by rw [pol_toLL]; exact h)
 
-theorem LL.questD' (A : Formula) : LL true {A} {quest A} :=
+theorem LL.questD' (A : Formula n) : LL true {A} {quest A} :=
   LL.questD (LL.ax A : LL true {A} (A ::ₘ 0))
 
 set_option maxHeartbeats 8000000 in
@@ -692,13 +673,13 @@ theorem LL.of_provable_table3 {S : Sequent} (h : Provable S) :
       exact llc (LL.contr_central h3)
 
 /-- Soundness w.r.t. Table 3 for sequents `Γ; ⊢ ;Δ`: `Γ* ⊢ Δ*` is provable in linear logic. -/
-theorem LL.of_provable_table3_linear {Γ Δ : Multiset Formula}
+theorem LL.of_provable_table3_linear {Γ Δ : Multiset (Formula n)}
     (h : Provable ⟪Γ ; 0 ⊢ 0 ; Δ⟫) : LL true (Γ.map toLL) (Δ.map toLL) := by
   simpa using LL.of_provable_table3 h
 
 /-- **Soundness w.r.t. Table 3, neutral atoms.**  If all atoms are neutral and `Γ; ⊢ ;Δ` is
 provable in LU, then the Table 3 decomposition `toLinear` gives an LL-provable sequent. -/
-theorem LL.of_provable_toLinear {Γ Δ : Multiset Formula} (hΓ : ∀ A ∈ Γ, A.AtomsNeutral)
+theorem LL.of_provable_toLinear {Γ Δ : Multiset (Formula n)} (hΓ : ∀ A ∈ Γ, A.AtomsNeutral)
     (hΔ : ∀ A ∈ Δ, A.AtomsNeutral) (h : Provable ⟪Γ ; 0 ⊢ 0 ; Δ⟫) :
     LL true (Γ.map toLinear) (Δ.map toLinear) := by
   have e₁ : Γ.map toLL = Γ.map toLinear :=
@@ -710,10 +691,10 @@ theorem LL.of_provable_toLinear {Γ Δ : Multiset Formula} (hΓ : ∀ A ∈ Γ, 
 /-! ## §4 again: the equivalence of LU (neutral linear) and LL -/
 
 /-- On linear formulas with neutral atoms the translation is the identity. -/
-theorem Formula.toLL_of_isNeutralLinear {A : Formula} (h : A.IsNeutralLinear) : A.toLL = A := by
+theorem Formula.toLL_of_isNeutralLinear {A : Formula n} (h : A.IsNeutralLinear) : A.toLL = A := by
   induction A <;> simp_all [IsNeutralLinear, toLL, atomLL]
 
-theorem map_toLL_of_neutralLinear {Γ : Multiset Formula} (h : ∀ A ∈ Γ, A.IsNeutralLinear) :
+theorem map_toLL_of_neutralLinear {Γ : Multiset (Formula n)} (h : ∀ A ∈ Γ, A.IsNeutralLinear) :
     Γ.map toLL = Γ := by
   conv_rhs => rw [← Multiset.map_id Γ]
   exact Multiset.map_congr rfl fun A hA => Formula.toLL_of_isNeutralLinear (h A hA)
@@ -721,17 +702,17 @@ theorem map_toLL_of_neutralLinear {Γ : Multiset Formula} (h : ∀ A ∈ Γ, A.I
 /-- **§4: LU with neutral atoms is equivalent to linear logic.**  For linear formulas with
 neutral atoms, `Γ; ⊢ ;Δ` is provable in LU (with cuts, on arbitrary formulas) iff `Γ ⊢ Δ` is
 provable in linear logic. -/
-theorem provable_iff_LL {Γ Δ : Multiset Formula} (hΓ : ∀ A ∈ Γ, A.IsNeutralLinear)
+theorem provable_iff_LL {Γ Δ : Multiset (Formula n)} (hΓ : ∀ A ∈ Γ, A.IsNeutralLinear)
     (hΔ : ∀ A ∈ Δ, A.IsNeutralLinear) : Provable ⟪Γ ; 0 ⊢ 0 ; Δ⟫ ↔ LL true Γ Δ :=
   ⟨fun h => (LL.of_provable_table3_linear h).congr (map_toLL_of_neutralLinear hΓ)
     (map_toLL_of_neutralLinear hΔ), LL.provable⟩
 
 /-- Cut elimination for linear logic (not proved here). -/
-def LLCutElimination : Prop := ∀ Γ Δ : Multiset Formula, LL true Γ Δ → LL false Γ Δ
+def LLCutElimination : Prop := ∀ {n : ℕ} (Γ Δ : Multiset (Formula n)), LL true Γ Δ → LL false Γ Δ
 
 /-- Cut elimination for LU on linear sequents `Γ; ⊢ ;Δ` with neutral atoms reduces to cut
 elimination for linear logic (taken as a hypothesis). -/
-theorem cutFreeProvable_of_LLCutElimination (hLL : LLCutElimination) {Γ Δ : Multiset Formula}
+theorem cutFreeProvable_of_LLCutElimination (hLL : LLCutElimination) {Γ Δ : Multiset (Formula n)}
     (hΓ : ∀ A ∈ Γ, A.IsNeutralLinear) (hΔ : ∀ A ∈ Δ, A.IsNeutralLinear)
     (h : Provable ⟪Γ ; 0 ⊢ 0 ; Δ⟫) : CutFreeProvable ⟪Γ ; 0 ⊢ 0 ; Δ⟫ :=
   LL.cutFreeProvable (hLL _ _ ((provable_iff_LL hΓ hΔ).1 h))

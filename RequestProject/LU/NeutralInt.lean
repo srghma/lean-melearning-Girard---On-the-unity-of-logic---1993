@@ -18,13 +18,15 @@ public import RequestProject.LU.Subformula
 
 namespace LU
 
+variable {n : ℕ}
+
 open Formula
 
 theorem linear_within {S : Sequent} (h : CutFreeProvable S) (hS : LinearSeq S) :
     ProvableWithin .linear S :=
   (h.allIn subClosed_linear hS).mono (fun _ _ h => h) (fun _ h => h.2)
 
-theorem Formula.IsNeutralInt.pol_eq {A : Formula} (h : A.IsNeutralInt) : A.pol = .neu := by
+theorem Formula.IsNeutralInt.pol_eq {A : Formula n} (h : A.IsNeutralInt) : A.pol = .neu := by
   induction A with
   | atom p ts => exact h
   | conj A B ihA ihB => simp [pol, ihA h.1, ihB h.2, Pol.conj]
@@ -43,7 +45,7 @@ theorem Rule.neutral {ps : List Sequent} {c : Sequent} (hr : Rule ps c) (hc : Ne
       (ps = [] → Multiset.card c.L ≤ 1) ∧
       (ps ≠ [] → ∃ p ∈ ps, Multiset.card c.L ≤ Multiset.card p.L) := by
   obtain ⟨hA, hCR, hR⟩ : AllIn IsNeutralInt c ∧ c.CR = 0 ∧ Multiset.card c.R = 1 := hc
-  have hpol : ∀ A : Formula, A.IsNeutralInt → A.pol = .neu := fun A h => h.pol_eq
+  have hpol : ∀ {n : ℕ} (A : Formula n), A.IsNeutralInt → A.pol = .neu := fun A h => h.pol_eq
   cases hr <;>
     simp only [allIn_mk, Multiset.mem_cons, Multiset.mem_add, Multiset.mem_singleton,
       or_imp, forall_and, forall_eq, IsNeutralInt] at hA <;>

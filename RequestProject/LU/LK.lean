@@ -25,62 +25,64 @@ classical formulas is a derived rule of Gentzen's LK.  Hence:
 
 namespace LU
 
+variable {n : ℕ}
+
 open Formula
 
 /-- Gentzen's sequent calculus LK (with weakening and contraction, without cut) for the
 connectives of the classical fragment.  `LK Γ Δ` means `Γ ⊢ Δ`. -/
-inductive LK : Multiset Formula → Multiset Formula → Prop where
-  | ax (A : Formula) : LK {A} {A}
-  | weakL (Γ Δ : Multiset Formula) (A : Formula) : LK Γ Δ → LK (A ::ₘ Γ) Δ
-  | weakR (Γ Δ : Multiset Formula) (A : Formula) : LK Γ Δ → LK Γ (A ::ₘ Δ)
-  | contrL (Γ Δ : Multiset Formula) (A : Formula) : LK (A ::ₘ A ::ₘ Γ) Δ → LK (A ::ₘ Γ) Δ
-  | contrR (Γ Δ : Multiset Formula) (A : Formula) : LK Γ (A ::ₘ A ::ₘ Δ) → LK Γ (A ::ₘ Δ)
-  | trueR : LK 0 {one}
-  | falseL (Γ Δ : Multiset Formula) : LK (zero ::ₘ Γ) Δ
-  | negL (Γ Δ : Multiset Formula) (A : Formula) : LK Γ (A ::ₘ Δ) → LK (neg A ::ₘ Γ) Δ
-  | negR (Γ Δ : Multiset Formula) (A : Formula) : LK (A ::ₘ Γ) Δ → LK Γ (neg A ::ₘ Δ)
-  | conjR (Γ Δ : Multiset Formula) (A B : Formula) :
+inductive LK : {n : ℕ} → Multiset (Formula n) → Multiset (Formula n) → Prop where
+  | ax {n : ℕ} (A : Formula n) : LK {A} {A}
+  | weakL {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula n) : LK Γ Δ → LK (A ::ₘ Γ) Δ
+  | weakR {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula n) : LK Γ Δ → LK Γ (A ::ₘ Δ)
+  | contrL {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula n) : LK (A ::ₘ A ::ₘ Γ) Δ → LK (A ::ₘ Γ) Δ
+  | contrR {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula n) : LK Γ (A ::ₘ A ::ₘ Δ) → LK Γ (A ::ₘ Δ)
+  | trueR {n : ℕ} : LK 0 {(one : Formula n)}
+  | falseL {n : ℕ} (Γ Δ : Multiset (Formula n)) : LK (zero ::ₘ Γ) Δ
+  | negL {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula n) : LK Γ (A ::ₘ Δ) → LK (neg A ::ₘ Γ) Δ
+  | negR {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula n) : LK (A ::ₘ Γ) Δ → LK Γ (neg A ::ₘ Δ)
+  | conjR {n : ℕ} (Γ Δ : Multiset (Formula n)) (A B : Formula n) :
       LK Γ (A ::ₘ Δ) → LK Γ (B ::ₘ Δ) → LK Γ (conj A B ::ₘ Δ)
-  | conjL (Γ Δ : Multiset Formula) (A B : Formula) :
+  | conjL {n : ℕ} (Γ Δ : Multiset (Formula n)) (A B : Formula n) :
       LK (A ::ₘ B ::ₘ Γ) Δ → LK (conj A B ::ₘ Γ) Δ
-  | disjR (Γ Δ : Multiset Formula) (A B : Formula) :
+  | disjR {n : ℕ} (Γ Δ : Multiset (Formula n)) (A B : Formula n) :
       LK Γ (A ::ₘ B ::ₘ Δ) → LK Γ (disj A B ::ₘ Δ)
-  | disjL (Γ Δ : Multiset Formula) (A B : Formula) :
+  | disjL {n : ℕ} (Γ Δ : Multiset (Formula n)) (A B : Formula n) :
       LK (A ::ₘ Γ) Δ → LK (B ::ₘ Γ) Δ → LK (disj A B ::ₘ Γ) Δ
-  | impR (Γ Δ : Multiset Formula) (A B : Formula) :
+  | impR {n : ℕ} (Γ Δ : Multiset (Formula n)) (A B : Formula n) :
       LK (A ::ₘ Γ) (B ::ₘ Δ) → LK Γ (imp A B ::ₘ Δ)
-  | impL (Γ Δ : Multiset Formula) (A B : Formula) :
+  | impL {n : ℕ} (Γ Δ : Multiset (Formula n)) (A B : Formula n) :
       LK Γ (A ::ₘ Δ) → LK (B ::ₘ Γ) Δ → LK (imp A B ::ₘ Γ) Δ
-  /-- `∀x`-right, with the eigenvariable condition expressed by shifting the context. -/
-  | allR (Γ Δ : Multiset Formula) (A : Formula) :
+  /-- `∀x`-right, with the eigenvariable condition expressed by weakening the context. -/
+  | allR {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula (n + 1)) :
       LK (sh Γ) (A ::ₘ sh Δ) → LK Γ (call A ::ₘ Δ)
-  | allL (Γ Δ : Multiset Formula) (A : Formula) (t : Term) :
+  | allL {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula (n + 1)) (t : Term n) :
       LK (A.inst t ::ₘ Γ) Δ → LK (call A ::ₘ Γ) Δ
-  | exR (Γ Δ : Multiset Formula) (A : Formula) (t : Term) :
+  | exR {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula (n + 1)) (t : Term n) :
       LK Γ (A.inst t ::ₘ Δ) → LK Γ (cex A ::ₘ Δ)
-  /-- `∃x`-left, with the eigenvariable condition expressed by shifting the context. -/
-  | exL (Γ Δ : Multiset Formula) (A : Formula) :
+  /-- `∃x`-left, with the eigenvariable condition expressed by weakening the context. -/
+  | exL {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula (n + 1)) :
       LK (A ::ₘ sh Γ) (sh Δ) → LK (cex A ::ₘ Γ) Δ
 
 namespace LK
 
-theorem congr {Γ Γ' Δ Δ' : Multiset Formula} (h : LK Γ Δ) (e1 : Γ = Γ') (e2 : Δ = Δ') :
+theorem congr {Γ Γ' Δ Δ' : Multiset (Formula n)} (h : LK Γ Δ) (e1 : Γ = Γ') (e2 : Δ = Δ') :
     LK Γ' Δ' := e1 ▸ e2 ▸ h
 
-theorem weakenL {Γ Δ : Multiset Formula} (h : LK Γ Δ) : ∀ E, LK (E + Γ) Δ := by
+theorem weakenL {Γ Δ : Multiset (Formula n)} (h : LK Γ Δ) : ∀ E, LK (E + Γ) Δ := by
   intro E
   induction E using Multiset.induction_on with
   | empty => simpa using h
   | cons A E ih => rw [Multiset.cons_add]; exact .weakL _ _ A ih
 
-theorem weakenR {Γ Δ : Multiset Formula} (h : LK Γ Δ) : ∀ E, LK Γ (E + Δ) := by
+theorem weakenR {Γ Δ : Multiset (Formula n)} (h : LK Γ Δ) : ∀ E, LK Γ (E + Δ) := by
   intro E
   induction E using Multiset.induction_on with
   | empty => simpa using h
   | cons A E ih => rw [Multiset.cons_add]; exact .weakR _ _ A ih
 
 /-- Weakening on both sides: `Γ ⊢ Δ` gives `Γ' ⊢ Δ'` whenever `Γ ≤ Γ'` and `Δ ≤ Δ'`. -/
-theorem weaken {Γ Γ' Δ Δ' : Multiset Formula} (h : LK Γ Δ) (h1 : Γ ≤ Γ') (h2 : Δ ≤ Δ') :
+theorem weaken {Γ Γ' Δ Δ' : Multiset (Formula n)} (h : LK Γ Δ) (h1 : Γ ≤ Γ') (h2 : Δ ≤ Δ') :
     LK Γ' Δ' := by
   obtain ⟨E, rfl⟩ := Multiset.le_iff_exists_add.1 h1
   obtain ⟨F, rfl⟩ := Multiset.le_iff_exists_add.1 h2
@@ -233,7 +235,7 @@ theorem lk_of_cutFree_aux {S : Sequent}
   -- the remaining rules involve a neutral formula, which cannot be classical
   all_goals
     exfalso
-    have hneu : ∀ A : Formula, A.IsClassical → A.pol ≠ .neu := fun A h => h.pol_ne_neu
+    have hneu : ∀ {n : ℕ} (A : Formula n), A.IsClassical → A.pol ≠ .neu := fun A h => h.pol_ne_neu
     simp only [IsClassical] at hA
     rename_i h1 h2
     first
