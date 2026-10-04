@@ -93,27 +93,27 @@ def IsLinear {n : ℕ} : Formula n → Prop
 end Formula
 
 /-- All formulas of a sequent satisfy `F`. -/
-def AllIn (F : ∀ {n : ℕ}, Formula n → Prop) (S : Sequent) : Prop := ∀ A ∈ S.formulas, F A
+def AllIn (F : ∀ {n : ℕ}, Formula n → Prop) (S : Sequent n) : Prop := ∀ A ∈ S.formulas, F A
 
 /-- `μ(S)`: the number of negative formulas in `Γ` plus the number of positive formulas
 in `Δ`, for `S = Γ;Γ' ⊢ Δ';Δ`. -/
-def mu (S : Sequent) : ℕ :=
+def mu (S : Sequent n) : ℕ :=
   Multiset.card (S.L.filter (fun A => A.pol = .neg)) +
     Multiset.card (S.R.filter (fun A => A.pol = .pos))
 
 /-- Classical sequents. -/
-def ClassicalSeq (S : Sequent) : Prop := AllIn IsClassical S ∧ mu S ≤ 1
+def ClassicalSeq (S : Sequent n) : Prop := AllIn IsClassical S ∧ mu S ≤ 1
 
 /-- Intuitionistic sequents `Γ;Γ' ⊢ ;A`. -/
-def IntSeq (S : Sequent) : Prop :=
-  AllIn IsIntuitionistic S ∧ S.CR = 0 ∧ Multiset.card S.R = 1
+def IntSeq (S : Sequent n) : Prop :=
+  AllIn IsIntuitionistic S ∧ S.CR = ∅ ∧ Multiset.card S.R = 1
 
 /-- Neutral intuitionistic sequents `Γ;Γ' ⊢ ;A` with at most one formula in `Γ`. -/
-def NeutralIntSeq (S : Sequent) : Prop :=
-  AllIn IsNeutralInt S ∧ S.CR = 0 ∧ Multiset.card S.R = 1 ∧ Multiset.card S.L ≤ 1
+def NeutralIntSeq (S : Sequent n) : Prop :=
+  AllIn IsNeutralInt S ∧ S.CR = ∅ ∧ Multiset.card S.R = 1 ∧ Multiset.card S.L ≤ 1
 
 /-- Linear sequents. -/
-def LinearSeq (S : Sequent) : Prop := AllIn IsLinear S
+def LinearSeq (S : Sequent n) : Prop := AllIn IsLinear S
 
 /-- The four remarkable fragments of §6. -/
 inductive Fragment where
@@ -123,7 +123,7 @@ inductive Fragment where
   | linear
 
 /-- The sequents of a fragment. -/
-def Fragment.Seq : Fragment → Sequent → Prop
+def Fragment.Seq : Fragment → ∀ {n : ℕ}, Sequent n → Prop
   | .classical => ClassicalSeq
   | .intuitionistic => IntSeq
   | .neutralIntuitionistic => NeutralIntSeq
@@ -131,6 +131,6 @@ def Fragment.Seq : Fragment → Sequent → Prop
 
 /-- A sequent is *provable within the fragment* `F` if it has a cut-free derivation all of
 whose sequents are sequents of `F`. -/
-def ProvableWithin (F : Fragment) (S : Sequent) : Prop := Derivable Rule F.Seq S
+def ProvableWithin (F : Fragment) (S : Sequent n) : Prop := Derivable Rule F.Seq S
 
 end LU

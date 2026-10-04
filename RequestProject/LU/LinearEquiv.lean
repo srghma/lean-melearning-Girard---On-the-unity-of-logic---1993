@@ -137,6 +137,46 @@ theorem contr_central {b : Bool} {Γ' Δ' Γ Δ : Multiset (Formula n)}
     LL b (Γ.map bang + Γ') (Δ.map quest + Δ') :=
   bangC_all Γ (questC_all Δ h)
 
+/-- Inserting a formula in a central zone translated by a map `F` producing `!`-formulas
+(left): with the formula already present, this is a contraction (resp. a weakening). -/
+theorem central_insertL {m : ℕ} {b : Bool} {F : Formula m → Formula n}
+    (hF : ∀ B, ∃ X, F B = bang X) {A : Formula m} {C : Finset (Formula m)}
+    {Γ Δ : Multiset (Formula n)} :
+    LL b (F A ::ₘ (Γ + C.val.map F)) Δ ↔ LL b (Γ + (insert A C).val.map F) Δ := by
+  by_cases hA : A ∈ C
+  · rw [Finset.insert_eq_of_mem hA]
+    obtain ⟨X, hX⟩ := hF A
+    obtain ⟨C', hC'⟩ : ∃ C', C.val = A ::ₘ C' := ⟨C.val.erase A, (Multiset.cons_erase hA).symm⟩
+    rw [hC', Multiset.map_cons, hX]
+    constructor
+    · intro h
+      have h1 : LL b (bang X ::ₘ bang X ::ₘ (Γ + C'.map F)) Δ := llc h
+      exact llc (LL.bangC h1)
+    · intro h
+      exact LL.bangW X h
+  · rw [Finset.insert_val_of_notMem hA, Multiset.map_cons]
+    constructor <;> intro h <;> exact llc h
+
+/-- Inserting a formula in a central zone translated by a map `F` producing `?`-formulas
+(right). -/
+theorem central_insertR {m : ℕ} {b : Bool} {F : Formula m → Formula n}
+    (hF : ∀ B, ∃ X, F B = quest X) {A : Formula m} {C : Finset (Formula m)}
+    {Γ Δ : Multiset (Formula n)} :
+    LL b Γ (F A ::ₘ (C.val.map F + Δ)) ↔ LL b Γ ((insert A C).val.map F + Δ) := by
+  by_cases hA : A ∈ C
+  · rw [Finset.insert_eq_of_mem hA]
+    obtain ⟨X, hX⟩ := hF A
+    obtain ⟨C', hC'⟩ : ∃ C', C.val = A ::ₘ C' := ⟨C.val.erase A, (Multiset.cons_erase hA).symm⟩
+    rw [hC', Multiset.map_cons, hX]
+    constructor
+    · intro h
+      have h1 : LL b Γ (quest X ::ₘ quest X ::ₘ (C'.map F + Δ)) := llc h
+      exact llc (LL.questC h1)
+    · intro h
+      exact llc (LL.questW X h)
+  · rw [Finset.insert_val_of_notMem hA, Multiset.map_cons]
+    constructor <;> intro h <;> exact llc h
+
 end LL
 
 /-! ## The "easy inductive argument" -/
@@ -383,156 +423,157 @@ set_option maxHeartbeats 4000000 in
 /-- **Translation of LU into LL** (§4).  An LU derivation (possibly with cuts) all of whose
 sequents consist of linear formulas with neutral atoms, of a sequent `Γ;Γ' ⊢ Δ';Δ`, yields an
 LL derivation (with cut) of `Γ, !Γ' ⊢ ?Δ', Δ`. -/
-theorem LL.of_derivable_neutralLinear {S : Sequent}
+theorem LL.of_derivable_neutralLinear {S : Sequent n}
     (h : Derivable LURule (AllIn IsNeutralLinear) S) :
-    LL true (S.L + S.CL.map bang) (S.CR.map quest + S.R) := by
+    LL true (S.L + S.CL.val.map bang) (S.CR.val.map quest + S.R) := by
   induction h with
-  | mk ps c hr hc hps ih =>
-  clear hps
+  | mk ps c hr hc hs hu ihs ihu =>
+  have ih := Premise.forall_all
+    (Q := fun s => LL true (s.L + s.CL.val.map bang) (s.CR.val.map quest + s.R)) ihs ihu
+  clear hs hu ihs ihu
+  have hB : ∀ {k : ℕ} (B : Formula k), ∃ X, bang B = bang X := fun B => ⟨B, rfl⟩
+  have hQ : ∀ {k : ℕ} (B : Formula k), ∃ X, quest B = quest X := fun B => ⟨B, rfl⟩
   rcases hr with hr | hr
   · cases hr <;>
       simp only [List.mem_cons, List.not_mem_nil, or_false, forall_eq_or_imp, forall_eq,
-        IsEmpty.forall_iff, implies_true] at ih <;>
+        IsEmpty.forall_iff, implies_true, Premise.all_same, Premise.all_up] at ih <;>
       (try (simp [allIn_mk, IsNeutralLinear] at hc; done)) <;>
       dsimp only at ih ⊢
     case ax A => exact llc (LL.ax A)
-    case weakR Γ Γ' Δ' Δ A => exact llc (LL.questW A ih)
-    case weakL Γ Γ' Δ' Δ A => exact llc (LL.bangW A ih)
-    case contrR Γ Γ' Δ' Δ A =>
-      have h1 : LL true (Γ + Γ'.map bang) (quest A ::ₘ quest A ::ₘ (Δ'.map quest + Δ)) :=
-        llc ih
-      exact llc (LL.questC h1)
-    case contrL Γ Γ' Δ' Δ A =>
-      have h1 : LL true (bang A ::ₘ bang A ::ₘ (Γ + Γ'.map bang)) (Δ'.map quest + Δ) :=
-        llc ih
-      exact llc (LL.bangC h1)
+    case weakR Γ Γ' Δ' Δ A => exact (LL.central_insertR hQ).1 (llc (LL.questW A ih))
+    case weakL Γ Γ' Δ' Δ A => exact (LL.central_insertL hB).1 (LL.bangW A ih)
     case inR Γ Γ' Δ' Δ A =>
-      have h1 : LL true (Γ + Γ'.map bang) (A ::ₘ (Δ'.map quest + Δ)) := llc ih
-      exact llc (LL.questD h1)
+      have h1 : LL true (Γ + Γ'.val.map bang) (A ::ₘ (Δ'.val.map quest + Δ)) := llc ih
+      exact (LL.central_insertR hQ).1 (LL.questD h1)
     case inL Γ Γ' Δ' Δ A =>
-      have h1 : LL true (A ::ₘ (Γ + Γ'.map bang)) (Δ'.map quest + Δ) := llc ih
-      exact llc (LL.bangD h1)
+      have h1 : LL true (A ::ₘ (Γ + Γ'.val.map bang)) (Δ'.val.map quest + Δ) := llc ih
+      exact (LL.central_insertL hB).1 (LL.bangD h1)
     case outR Γ Γ' Δ' Δ N hN =>
       have hN' : N.IsNeutralLinear := hc N (by simp [Sequent.formulas])
-      have h1 : LL true (Γ + Γ'.map bang) (quest N ::ₘ (Δ'.map quest + Δ)) := llc ih
+      have h1 : LL true (Γ + Γ'.val.map bang) (quest N ::ₘ (Δ'.val.map quest + Δ)) :=
+        (LL.central_insertR hQ).2 ih
       exact llc (LL.cut' (Λ := 0) _ h1 (hN'.bang_quest.2 hN))
     case outL Γ Γ' Δ' Δ P hP =>
       have hP' : P.IsNeutralLinear := hc P (by simp [Sequent.formulas])
-      have h1 : LL true (bang P ::ₘ (Γ + Γ'.map bang)) (Δ'.map quest + Δ) := llc ih
+      have h1 : LL true (bang P ::ₘ (Γ + Γ'.val.map bang)) (Δ'.val.map quest + Δ) :=
+        (LL.central_insertL hB).2 ih
       exact llc (LL.cut' _ (hP'.bang_quest.1 hP) h1)
     case oneR => exact llc LL.oneR
     case botL => exact llc LL.botL
     case tensorR Γ Λ Γ' Δ' Δ Θ A B =>
-      have h1 : LL true (Γ + Γ'.map bang) (A ::ₘ (Δ'.map quest + Δ)) := llc ih.1
-      have h2 : LL true (Λ + Γ'.map bang) (B ::ₘ (Δ'.map quest + Θ)) := llc ih.2
-      have h3 : LL true (Γ'.map bang + Γ'.map bang + (Γ + Λ))
-          (Δ'.map quest + Δ'.map quest + (tensor A B ::ₘ (Δ + Θ))) := llc (LL.tensorR h1 h2)
+      have h1 : LL true (Γ + Γ'.val.map bang) (A ::ₘ (Δ'.val.map quest + Δ)) := llc ih.1
+      have h2 : LL true (Λ + Γ'.val.map bang) (B ::ₘ (Δ'.val.map quest + Θ)) := llc ih.2
+      have h3 : LL true (Γ'.val.map bang + Γ'.val.map bang + (Γ + Λ))
+          (Δ'.val.map quest + Δ'.val.map quest + (tensor A B ::ₘ (Δ + Θ))) := llc (LL.tensorR h1 h2)
       exact llc (LL.contr_central h3)
     case tensorL Γ Γ' Δ' Δ A B =>
-      have h1 : LL true (A ::ₘ B ::ₘ (Γ + Γ'.map bang)) (Δ'.map quest + Δ) := llc ih
+      have h1 : LL true (A ::ₘ B ::ₘ (Γ + Γ'.val.map bang)) (Δ'.val.map quest + Δ) := llc ih
       exact llc (LL.tensorL h1)
     case parR Γ Γ' Δ' Δ A B =>
-      have h1 : LL true (Γ + Γ'.map bang) (A ::ₘ B ::ₘ (Δ'.map quest + Δ)) := llc ih
+      have h1 : LL true (Γ + Γ'.val.map bang) (A ::ₘ B ::ₘ (Δ'.val.map quest + Δ)) := llc ih
       exact llc (LL.parR h1)
     case parL Γ Λ Γ' Δ' Δ Θ A B =>
-      have h1 : LL true (A ::ₘ (Γ + Γ'.map bang)) (Δ'.map quest + Δ) := llc ih.1
-      have h2 : LL true (B ::ₘ (Λ + Γ'.map bang)) (Δ'.map quest + Θ) := llc ih.2
-      have h3 : LL true (Γ'.map bang + Γ'.map bang + (par A B ::ₘ (Γ + Λ)))
-          (Δ'.map quest + Δ'.map quest + (Δ + Θ)) := llc (LL.parL h1 h2)
+      have h1 : LL true (A ::ₘ (Γ + Γ'.val.map bang)) (Δ'.val.map quest + Δ) := llc ih.1
+      have h2 : LL true (B ::ₘ (Λ + Γ'.val.map bang)) (Δ'.val.map quest + Θ) := llc ih.2
+      have h3 : LL true (Γ'.val.map bang + Γ'.val.map bang + (par A B ::ₘ (Γ + Λ)))
+          (Δ'.val.map quest + Δ'.val.map quest + (Δ + Θ)) := llc (LL.parL h1 h2)
       exact llc (LL.contr_central h3)
     case lolliR Γ Γ' Δ' Δ A B =>
-      have h1 : LL true (A ::ₘ (Γ + Γ'.map bang)) (B ::ₘ (Δ'.map quest + Δ)) := llc ih
+      have h1 : LL true (A ::ₘ (Γ + Γ'.val.map bang)) (B ::ₘ (Δ'.val.map quest + Δ)) := llc ih
       exact llc (LL.lolliR h1)
     case lolliL Γ Λ Γ' Δ' Δ Θ A B =>
-      have h1 : LL true (Γ + Γ'.map bang) (A ::ₘ (Δ'.map quest + Δ)) := llc ih.1
-      have h2 : LL true (B ::ₘ (Λ + Γ'.map bang)) (Δ'.map quest + Θ) := llc ih.2
-      have h3 : LL true (Γ'.map bang + Γ'.map bang + (lolli A B ::ₘ (Γ + Λ)))
-          (Δ'.map quest + Δ'.map quest + (Δ + Θ)) := llc (LL.lolliL h1 h2)
+      have h1 : LL true (Γ + Γ'.val.map bang) (A ::ₘ (Δ'.val.map quest + Δ)) := llc ih.1
+      have h2 : LL true (B ::ₘ (Λ + Γ'.val.map bang)) (Δ'.val.map quest + Θ) := llc ih.2
+      have h3 : LL true (Γ'.val.map bang + Γ'.val.map bang + (lolli A B ::ₘ (Γ + Λ)))
+          (Δ'.val.map quest + Δ'.val.map quest + (Δ + Θ)) := llc (LL.lolliL h1 h2)
       exact llc (LL.contr_central h3)
     case topR Γ Δ => exact llc (LL.topR Γ Δ)
     case zeroL Γ Δ => exact llc (LL.zeroL Γ Δ)
     case withR Γ Γ' Δ' Δ A B =>
-      have h1 : LL true (Γ + Γ'.map bang) (A ::ₘ (Δ'.map quest + Δ)) := llc ih.1
-      have h2 : LL true (Γ + Γ'.map bang) (B ::ₘ (Δ'.map quest + Δ)) := llc ih.2
+      have h1 : LL true (Γ + Γ'.val.map bang) (A ::ₘ (Δ'.val.map quest + Δ)) := llc ih.1
+      have h2 : LL true (Γ + Γ'.val.map bang) (B ::ₘ (Δ'.val.map quest + Δ)) := llc ih.2
       exact llc (LL.withR h1 h2)
     case withL₁ Γ Γ' Δ' Δ A B =>
-      have h1 : LL true (A ::ₘ (Γ + Γ'.map bang)) (Δ'.map quest + Δ) := llc ih
+      have h1 : LL true (A ::ₘ (Γ + Γ'.val.map bang)) (Δ'.val.map quest + Δ) := llc ih
       exact llc (LL.withL₁ B h1)
     case withL₂ Γ Γ' Δ' Δ A B =>
-      have h1 : LL true (B ::ₘ (Γ + Γ'.map bang)) (Δ'.map quest + Δ) := llc ih
+      have h1 : LL true (B ::ₘ (Γ + Γ'.val.map bang)) (Δ'.val.map quest + Δ) := llc ih
       exact llc (LL.withL₂ A h1)
     case plusR₁ Γ Γ' Δ' Δ A B =>
-      have h1 : LL true (Γ + Γ'.map bang) (A ::ₘ (Δ'.map quest + Δ)) := llc ih
+      have h1 : LL true (Γ + Γ'.val.map bang) (A ::ₘ (Δ'.val.map quest + Δ)) := llc ih
       exact llc (LL.plusR₁ B h1)
     case plusR₂ Γ Γ' Δ' Δ A B =>
-      have h1 : LL true (Γ + Γ'.map bang) (B ::ₘ (Δ'.map quest + Δ)) := llc ih
+      have h1 : LL true (Γ + Γ'.val.map bang) (B ::ₘ (Δ'.val.map quest + Δ)) := llc ih
       exact llc (LL.plusR₂ A h1)
     case plusL Γ Γ' Δ' Δ A B =>
-      have h1 : LL true (A ::ₘ (Γ + Γ'.map bang)) (Δ'.map quest + Δ) := llc ih.1
-      have h2 : LL true (B ::ₘ (Γ + Γ'.map bang)) (Δ'.map quest + Δ) := llc ih.2
+      have h1 : LL true (A ::ₘ (Γ + Γ'.val.map bang)) (Δ'.val.map quest + Δ) := llc ih.1
+      have h2 : LL true (B ::ₘ (Γ + Γ'.val.map bang)) (Δ'.val.map quest + Δ) := llc ih.2
       exact llc (LL.plusL h1 h2)
     case negL Γ Γ' Δ' Δ A =>
-      have h1 : LL true (Γ + Γ'.map bang) (A ::ₘ (Δ'.map quest + Δ)) := llc ih
+      have h1 : LL true (Γ + Γ'.val.map bang) (A ::ₘ (Δ'.val.map quest + Δ)) := llc ih
       exact llc (LL.negL h1)
     case negR Γ Γ' Δ' Δ A =>
-      have h1 : LL true (A ::ₘ (Γ + Γ'.map bang)) (Δ'.map quest + Δ) := llc ih
+      have h1 : LL true (A ::ₘ (Γ + Γ'.val.map bang)) (Δ'.val.map quest + Δ) := llc ih
       exact llc (LL.negR h1)
     case bangR Γ' Δ' A =>
-      have h1 : LL true (Γ'.map bang) (A ::ₘ Δ'.map quest) := llc ih
+      have h1 : LL true (Γ'.val.map bang) (A ::ₘ Δ'.val.map quest) := llc ih
       exact llc (LL.bangR h1)
-    case bangL Γ Γ' Δ' Δ A => exact llc ih
-    case questR Γ Γ' Δ' Δ A => exact llc ih
+    case bangL Γ Γ' Δ' Δ A => exact llc ((LL.central_insertL hB).2 ih)
+    case questR Γ Γ' Δ' Δ A => exact llc ((LL.central_insertR hQ).2 ih)
     case questL Γ' Δ' A =>
-      have h1 : LL true (A ::ₘ Γ'.map bang) (Δ'.map quest) := llc ih
+      have h1 : LL true (A ::ₘ Γ'.val.map bang) (Δ'.val.map quest) := llc ih
       exact llc (LL.questL h1)
     case lallR Γ Γ' Δ' Δ A =>
-      have h1 : LL true (sh (Γ + Γ'.map bang)) (A ::ₘ sh (Δ'.map quest + Δ)) := by
-        rw [sh_add, sh_add, sh_map_bang, sh_map_quest]; exact llc ih
+      have h1 : LL true (sh (Γ + Γ'.val.map bang)) (A ::ₘ sh (Δ'.val.map quest + Δ)) := by
+        rw [sh_add, sh_add, sh_map_bang, sh_map_quest, ← shc_val, ← shc_val]; exact llc ih
       exact llc (LL.lallR h1)
     case lallL Γ Γ' Δ' Δ A t =>
-      have h1 : LL true (A.inst t ::ₘ (Γ + Γ'.map bang)) (Δ'.map quest + Δ) := llc ih
+      have h1 : LL true (A.inst t ::ₘ (Γ + Γ'.val.map bang)) (Δ'.val.map quest + Δ) := llc ih
       exact llc (LL.lallL t h1)
     case lexR Γ Γ' Δ' Δ A t =>
-      have h1 : LL true (Γ + Γ'.map bang) (A.inst t ::ₘ (Δ'.map quest + Δ)) := llc ih
+      have h1 : LL true (Γ + Γ'.val.map bang) (A.inst t ::ₘ (Δ'.val.map quest + Δ)) := llc ih
       exact llc (LL.lexR t h1)
     case lexL Γ Γ' Δ' Δ A =>
-      have h1 : LL true (A ::ₘ sh (Γ + Γ'.map bang)) (sh (Δ'.map quest + Δ)) := by
-        rw [sh_add, sh_add, sh_map_bang, sh_map_quest]; exact llc ih
+      have h1 : LL true (A ::ₘ sh (Γ + Γ'.val.map bang)) (sh (Δ'.val.map quest + Δ)) := by
+        rw [sh_add, sh_add, sh_map_bang, sh_map_quest, ← shc_val, ← shc_val]; exact llc ih
       exact llc (LL.lexL h1)
   · cases hr <;>
-      simp only [List.mem_cons, List.not_mem_nil, or_false, forall_eq_or_imp, forall_eq] at ih <;>
+      simp only [List.mem_cons, List.not_mem_nil, or_false, forall_eq_or_imp, forall_eq,
+        Premise.all_same] at ih <;>
       dsimp only at ih ⊢
     case cut Γ Λ Γ' Δ' Δ Θ A =>
-      have h1 : LL true (Γ + Γ'.map bang) (A ::ₘ (Δ'.map quest + Δ)) := llc ih.1
-      have h2 : LL true (A ::ₘ (Λ + Γ'.map bang)) (Δ'.map quest + Θ) := llc ih.2
-      have h3 : LL true (Γ'.map bang + Γ'.map bang + (Γ + Λ))
-          (Δ'.map quest + Δ'.map quest + (Δ + Θ)) := llc (LL.cut' A h1 h2)
+      have h1 : LL true (Γ + Γ'.val.map bang) (A ::ₘ (Δ'.val.map quest + Δ)) := llc ih.1
+      have h2 : LL true (A ::ₘ (Λ + Γ'.val.map bang)) (Δ'.val.map quest + Θ) := llc ih.2
+      have h3 : LL true (Γ'.val.map bang + Γ'.val.map bang + (Γ + Λ))
+          (Δ'.val.map quest + Δ'.val.map quest + (Δ + Θ)) := llc (LL.cut' A h1 h2)
       exact llc (LL.contr_central h3)
     case cutR Γ Γ' Δ' Δ A =>
-      have h1 : LL true (Γ + Γ'.map bang) (quest A ::ₘ (Δ'.map quest + Δ)) := llc ih.1
-      have h2 : LL true (A ::ₘ Γ'.map bang) (Δ'.map quest) := llc ih.2
-      have h3 : LL true (Γ'.map bang + Γ'.map bang + Γ)
-          (Δ'.map quest + Δ'.map quest + Δ) := llc (LL.cut' _ h1 (LL.questL h2))
+      have h1 : LL true (Γ + Γ'.val.map bang) (quest A ::ₘ (Δ'.val.map quest + Δ)) :=
+        (LL.central_insertR hQ).2 ih.1
+      have h2 : LL true (A ::ₘ Γ'.val.map bang) (Δ'.val.map quest) := llc ih.2
+      have h3 : LL true (Γ'.val.map bang + Γ'.val.map bang + Γ)
+          (Δ'.val.map quest + Δ'.val.map quest + Δ) := llc (LL.cut' _ h1 (LL.questL h2))
       exact llc (LL.contr_central h3)
     case cutL Λ Γ' Δ' Θ A =>
-      have h1 : LL true (Γ'.map bang) (A ::ₘ Δ'.map quest) := llc ih.1
-      have h2 : LL true (bang A ::ₘ (Λ + Γ'.map bang)) (Δ'.map quest + Θ) := llc ih.2
-      have h3 : LL true (Γ'.map bang + Γ'.map bang + Λ)
-          (Δ'.map quest + Δ'.map quest + Θ) := llc (LL.cut' _ (LL.bangR h1) h2)
+      have h1 : LL true (Γ'.val.map bang) (A ::ₘ Δ'.val.map quest) := llc ih.1
+      have h2 : LL true (bang A ::ₘ (Λ + Γ'.val.map bang)) (Δ'.val.map quest + Θ) :=
+        (LL.central_insertL hB).2 ih.2
+      have h3 : LL true (Γ'.val.map bang + Γ'.val.map bang + Λ)
+          (Δ'.val.map quest + Δ'.val.map quest + Θ) := llc (LL.cut' _ (LL.bangR h1) h2)
       exact llc (LL.contr_central h3)
 
 /-- §4, LU to LL: if `Γ; ⊢ ;Δ` has an LU derivation (possibly with cuts) in which every
 sequent consists of linear formulas with neutral atoms, then `Γ ⊢ Δ` is provable in linear
 logic. -/
 theorem LL.of_provable_neutralLinear {Γ Δ : Multiset (Formula n)}
-    (h : Derivable LURule (AllIn IsNeutralLinear) ⟪Γ ; 0 ⊢ 0 ; Δ⟫) : LL true Γ Δ := by
+    (h : Derivable LURule (AllIn IsNeutralLinear) ⟪Γ ; ∅ ⊢ ∅ ; Δ⟫) : LL true Γ Δ := by
   simpa using LL.of_derivable_neutralLinear h
 
 /-- §4, LU to LL, cut-free version: a cut-free LU proof of `Γ; ⊢ ;Δ` in which every formula
 is linear with neutral atoms translates into an LL proof of `Γ ⊢ Δ`.  (The hypothesis is only
 on the end-sequent: by the subformula property, it propagates to the whole proof.) -/
 theorem LL.of_cutFreeProvable_neutralLinear {Γ Δ : Multiset (Formula n)}
-    (h : CutFreeProvable ⟪Γ ; 0 ⊢ 0 ; Δ⟫) (hS : AllIn IsNeutralLinear ⟪Γ ; 0 ⊢ 0 ; Δ⟫) :
+    (h : CutFreeProvable ⟪Γ ; ∅ ⊢ ∅ ; Δ⟫) (hS : AllIn IsNeutralLinear ⟪Γ ; ∅ ⊢ ∅ ; Δ⟫) :
     LL true Γ Δ := by
   have h' := Derivable.allIn subClosed_neutralLinear h hS
   exact LL.of_provable_neutralLinear

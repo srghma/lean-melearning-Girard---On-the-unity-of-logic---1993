@@ -151,7 +151,8 @@ end LL
 
 section ToLU
 
-variable {R : List Sequent → Sequent → Prop} (hR : ∀ ps c, Rule ps c → R ps c)
+variable {R : ∀ {n : ℕ}, List (Premise n) → Sequent n → Prop}
+  (hR : ∀ {n : ℕ} (ps : List (Premise n)) (c : Sequent n), Rule ps c → R ps c)
 
 /-- Derivability in LU with rules `R` and no restriction on sequents. -/
 local notation "D" => Derivable R (fun _ => True)
@@ -159,64 +160,69 @@ local notation "D" => Derivable R (fun _ => True)
 include hR
 
 omit hR in
-theorem D_congr {S T : Sequent} (h : D S) (e : S = T) : D T := e ▸ h
+theorem D_congr {S T : Sequent n} (h : D S) (e : S = T) : D T := e ▸ h
 
-theorem D_rule0 {c : Sequent} (hr : Rule [] c) : D c :=
-  .mk [] c (hR _ _ hr) trivial (by simp)
+theorem D_rule0 {c : Sequent n} (hr : Rule [] c) : D c :=
+  .mk' [] c (hR _ _ hr) trivial (by simp)
 
-theorem D_rule1 {p c : Sequent} (hr : Rule [p] c) (h : D p) : D c :=
-  .mk [p] c (hR _ _ hr) trivial (by simpa using h)
+theorem D_rule1 {p : Premise n} {c : Sequent n} (hr : Rule [p] c) (h : p.All D) : D c :=
+  .mk' [p] c (hR _ _ hr) trivial (by simpa using h)
 
-theorem D_rule2 {p q c : Sequent} (hr : Rule [p, q] c) (hp : D p) (hq : D q) : D c :=
-  .mk [p, q] c (hR _ _ hr) trivial (by simp [hp, hq])
+theorem D_rule2 {p q : Premise n} {c : Sequent n} (hr : Rule [p, q] c) (hp : p.All D)
+    (hq : q.All D) : D c :=
+  .mk' [p, q] c (hR _ _ hr) trivial (by simp [hp, hq])
 
 /-- Move a multiset of formulas from the left linear zone into the central zone. -/
 theorem D_inL_all (M : Multiset (Formula n)) :
-    ∀ {Γ Γ' Δ' Δ : Multiset (Formula n)}, D ⟪M + Γ ; Γ' ⊢ Δ' ; Δ⟫ → D ⟪Γ ; M + Γ' ⊢ Δ' ; Δ⟫ := by
+    ∀ {Γ : Multiset (Formula n)} {Γ' Δ' : Finset (Formula n)} {Δ : Multiset (Formula n)},
+      D ⟪M + Γ ; Γ' ⊢ Δ' ; Δ⟫ → D ⟪Γ ; M.toFinset ∪ Γ' ⊢ Δ' ; Δ⟫ := by
   induction M using Multiset.induction_on with
   | empty => intro Γ Γ' Δ' Δ h; simpa using h
   | cons a M ih =>
     intro Γ Γ' Δ' Δ h
-    have h1 : D ⟪M + Γ ; a ::ₘ Γ' ⊢ Δ' ; Δ⟫ :=
-      D_rule1 hR (Rule.inL _ _ _ _ a) (D_congr h (by simp [Multiset.cons_add]))
-    exact D_congr (ih h1) (by simp [Multiset.cons_add])
+    have h1 : D ⟪M + Γ ; insert a Γ' ⊢ Δ' ; Δ⟫ :=
+      D_rule1 hR (Rule.inL _ _ _ _ a) (D_congr h (by simp))
+    exact D_congr (ih h1) (by simp)
 
 /-- Move a multiset of formulas from the right linear zone into the central zone. -/
 theorem D_inR_all (M : Multiset (Formula n)) :
-    ∀ {Γ Γ' Δ' Δ : Multiset (Formula n)}, D ⟪Γ ; Γ' ⊢ Δ' ; M + Δ⟫ → D ⟪Γ ; Γ' ⊢ M + Δ' ; Δ⟫ := by
+    ∀ {Γ : Multiset (Formula n)} {Γ' Δ' : Finset (Formula n)} {Δ : Multiset (Formula n)},
+      D ⟪Γ ; Γ' ⊢ Δ' ; M + Δ⟫ → D ⟪Γ ; Γ' ⊢ M.toFinset ∪ Δ' ; Δ⟫ := by
   induction M using Multiset.induction_on with
   | empty => intro Γ Γ' Δ' Δ h; simpa using h
   | cons a M ih =>
     intro Γ Γ' Δ' Δ h
-    have h1 : D ⟪Γ ; Γ' ⊢ a ::ₘ Δ' ; M + Δ⟫ :=
-      D_rule1 hR (Rule.inR _ _ _ _ a) (D_congr h (by simp [Multiset.cons_add]))
-    exact D_congr (ih h1) (by simp [Multiset.cons_add])
+    have h1 : D ⟪Γ ; Γ' ⊢ insert a Δ' ; M + Δ⟫ :=
+      D_rule1 hR (Rule.inR _ _ _ _ a) (D_congr h (by simp))
+    exact D_congr (ih h1) (by simp)
 
 /-- Move a multiset of positive formulas from the central zone to the left linear zone. -/
 theorem D_outL_all (M : Multiset (Formula n)) (hM : ∀ P ∈ M, P.pol = .pos) :
-    ∀ {Γ Γ' Δ' Δ : Multiset (Formula n)}, D ⟪Γ ; M + Γ' ⊢ Δ' ; Δ⟫ → D ⟪M + Γ ; Γ' ⊢ Δ' ; Δ⟫ := by
+    ∀ {Γ : Multiset (Formula n)} {Γ' Δ' : Finset (Formula n)} {Δ : Multiset (Formula n)},
+      D ⟪Γ ; M.toFinset ∪ Γ' ⊢ Δ' ; Δ⟫ → D ⟪M + Γ ; Γ' ⊢ Δ' ; Δ⟫ := by
   induction M using Multiset.induction_on with
   | empty => intro Γ Γ' Δ' Δ h; simpa using h
   | cons a M ih =>
     intro Γ Γ' Δ' Δ h
-    have h1 : D ⟪Γ ; M + (a ::ₘ Γ') ⊢ Δ' ; Δ⟫ :=
-      D_congr h (by simp [Multiset.cons_add])
+    have h1 : D ⟪Γ ; M.toFinset ∪ (insert a Γ') ⊢ Δ' ; Δ⟫ :=
+      D_congr h (by simp)
     have h2 := ih (fun P hP => hM P (Multiset.mem_cons_of_mem hP)) h1
     exact D_congr (D_rule1 hR (Rule.outL _ _ _ _ a (hM a (Multiset.mem_cons_self _ _))) h2)
-      (by simp [Multiset.cons_add])
+      (by simp)
 
 /-- Move a multiset of negative formulas from the central zone to the right linear zone. -/
 theorem D_outR_all (M : Multiset (Formula n)) (hM : ∀ N ∈ M, N.pol = .neg) :
-    ∀ {Γ Γ' Δ' Δ : Multiset (Formula n)}, D ⟪Γ ; Γ' ⊢ M + Δ' ; Δ⟫ → D ⟪Γ ; Γ' ⊢ Δ' ; M + Δ⟫ := by
+    ∀ {Γ : Multiset (Formula n)} {Γ' Δ' : Finset (Formula n)} {Δ : Multiset (Formula n)},
+      D ⟪Γ ; Γ' ⊢ M.toFinset ∪ Δ' ; Δ⟫ → D ⟪Γ ; Γ' ⊢ Δ' ; M + Δ⟫ := by
   induction M using Multiset.induction_on with
   | empty => intro Γ Γ' Δ' Δ h; simpa using h
   | cons a M ih =>
     intro Γ Γ' Δ' Δ h
-    have h1 : D ⟪Γ ; Γ' ⊢ M + (a ::ₘ Δ') ; Δ⟫ :=
-      D_congr h (by simp [Multiset.cons_add])
+    have h1 : D ⟪Γ ; Γ' ⊢ M.toFinset ∪ (insert a Δ') ; Δ⟫ :=
+      D_congr h (by simp)
     have h2 := ih (fun P hP => hM P (Multiset.mem_cons_of_mem hP)) h1
     exact D_congr (D_rule1 hR (Rule.outR _ _ _ _ a (hM a (Multiset.mem_cons_self _ _))) h2)
-      (by simp [Multiset.cons_add])
+      (by simp)
 
 omit hR in
 theorem pol_bang_mem {Γ : Multiset (Formula n)} : ∀ P ∈ Γ.map bang, P.pol = .pos := by
@@ -229,12 +235,13 @@ theorem pol_quest_mem {Δ : Multiset (Formula n)} : ∀ N ∈ Δ.map quest, N.po
 /-- **Translation of LL into LU** (§4).  An LL derivation of `Γ ⊢ Δ` gives an LU derivation
 of `Γ; ⊢ ;Δ` using the rules `R`, provided `R` contains the rules of LU and, if the LL
 derivation may use cuts, the cut rules. -/
-theorem LL.toLU {b : Bool} (hC : b = true → ∀ ps c, CutRule ps c → R ps c)
-    {Γ Δ : Multiset (Formula n)} (h : LL b Γ Δ) : D ⟪Γ ; 0 ⊢ 0 ; Δ⟫ := by
+theorem LL.toLU {b : Bool}
+    (hC : b = true → ∀ {n : ℕ} (ps : List (Premise n)) (c : Sequent n), CutRule ps c → R ps c)
+    {Γ Δ : Multiset (Formula n)} (h : LL b Γ Δ) : D ⟪Γ ; ∅ ⊢ ∅ ; Δ⟫ := by
   induction h with
   | ax A => exact D_rule0 hR (Rule.ax A)
   | cut A hb _ _ ih₁ ih₂ =>
-    exact .mk _ _ (hC hb _ _ (CutRule.cut _ _ 0 0 _ _ A)) trivial (by simp [ih₁, ih₂])
+    exact .mk' _ _ (hC hb _ _ (CutRule.cut _ _ ∅ ∅ _ _ A)) trivial (by simp [ih₁, ih₂])
   | oneR => exact D_rule0 hR Rule.oneR
   | oneL _ ih =>
     exact D_rule1 hR (Rule.outL _ _ _ _ one rfl) (D_rule1 hR (Rule.weakL _ _ _ _ one) ih)
@@ -259,33 +266,33 @@ theorem LL.toLU {b : Bool} (hC : b = true → ∀ ps c, CutRule ps c → R ps c)
   | negR _ ih => exact D_rule1 hR (Rule.negR _ _ _ _ _) ih
   | @bangR _ Γ Δ A _ ih =>
     -- `!Γ; ⊢ ;?Δ, A` ⟶ `;!Γ ⊢ ?Δ;A` ⟶ `;!Γ ⊢ ?Δ;!A` ⟶ `!Γ; ⊢ ;?Δ, !A`
-    have h1 : D ⟪0 ; Γ.map bang ⊢ 0 ; A ::ₘ Δ.map quest⟫ :=
-      D_congr (D_inL_all hR (Γ.map bang) (Γ := 0) (Γ' := 0) (Δ' := 0)
+    have h1 : D ⟪0 ; (Γ.map bang).toFinset ⊢ ∅ ; A ::ₘ Δ.map quest⟫ :=
+      D_congr (D_inL_all hR (Γ.map bang) (Γ := 0) (Γ' := ∅) (Δ' := ∅)
         (Δ := A ::ₘ Δ.map quest) (D_congr ih (by simp))) (by simp)
-    have h2 : D ⟪0 ; Γ.map bang ⊢ Δ.map quest ; {A}⟫ :=
-      D_congr (D_inR_all hR (Δ.map quest) (Γ := 0) (Γ' := Γ.map bang) (Δ' := 0) (Δ := {A})
+    have h2 : D ⟪0 ; (Γ.map bang).toFinset ⊢ (Δ.map quest).toFinset ; {A}⟫ :=
+      D_congr (D_inR_all hR (Δ.map quest) (Γ := 0) (Γ' := (Γ.map bang).toFinset) (Δ' := ∅) (Δ := {A})
         (D_congr h1 (by simp [← Multiset.singleton_add, add_comm]))) (by simp)
     have h3 := D_rule1 hR (Rule.bangR _ _ A) h2
-    have h4 : D ⟪0 ; Γ.map bang ⊢ 0 ; Δ.map quest + {bang A}⟫ :=
+    have h4 : D ⟪0 ; (Γ.map bang).toFinset ⊢ ∅ ; Δ.map quest + {bang A}⟫ :=
       D_outR_all hR _ pol_quest_mem (D_congr h3 (by simp))
-    have h5 := D_outL_all hR _ (pol_bang_mem (Γ := Γ)) (Γ := 0) (Γ' := 0) (Δ' := 0)
+    have h5 := D_outL_all hR _ (pol_bang_mem (Γ := Γ)) (Γ := 0) (Γ' := ∅) (Δ' := ∅)
       (Δ := Δ.map quest + {bang A}) (D_congr h4 (by simp))
     exact D_congr h5 (by simp [← Multiset.singleton_add, add_comm])
   | bangD _ ih => exact D_rule1 hR (Rule.bangL _ _ _ _ _) (D_rule1 hR (Rule.inL _ _ _ _ _) ih)
   | bangW A _ ih => exact D_rule1 hR (Rule.bangL _ _ _ _ _) (D_rule1 hR (Rule.weakL _ _ _ _ A) ih)
   | @bangC _ Γ Δ A _ ih =>
     have h1 := D_rule1 hR (Rule.inL _ _ _ _ _) (D_rule1 hR (Rule.inL _ _ _ _ _) ih)
-    exact D_rule1 hR (Rule.outL _ _ _ _ (bang A) rfl) (D_rule1 hR (Rule.contrL _ _ _ _ _) h1)
+    exact D_rule1 hR (Rule.outL _ _ _ _ (bang A) rfl) (D_congr h1 (by simp))
   | @questL _ Γ Δ A _ ih =>
-    have h1 : D ⟪{A} ; Γ.map bang ⊢ 0 ; Δ.map quest⟫ :=
-      D_congr (D_inL_all hR (Γ.map bang) (Γ := {A}) (Γ' := 0) (Δ' := 0) (Δ := Δ.map quest)
+    have h1 : D ⟪{A} ; (Γ.map bang).toFinset ⊢ ∅ ; Δ.map quest⟫ :=
+      D_congr (D_inL_all hR (Γ.map bang) (Γ := {A}) (Γ' := ∅) (Δ' := ∅) (Δ := Δ.map quest)
         (D_congr ih (by simp [← Multiset.singleton_add, add_comm]))) (by simp)
-    have h2 : D ⟪{A} ; Γ.map bang ⊢ Δ.map quest ; 0⟫ :=
-      D_congr (D_inR_all hR (Δ.map quest) (Γ := {A}) (Γ' := Γ.map bang) (Δ' := 0) (Δ := 0) (D_congr h1 (by simp))) (by simp)
+    have h2 : D ⟪{A} ; (Γ.map bang).toFinset ⊢ (Δ.map quest).toFinset ; 0⟫ :=
+      D_congr (D_inR_all hR (Δ.map quest) (Γ := {A}) (Γ' := (Γ.map bang).toFinset) (Δ' := ∅) (Δ := 0) (D_congr h1 (by simp))) (by simp)
     have h3 := D_rule1 hR (Rule.questL _ _ A) h2
-    have h4 : D ⟪{quest A} ; Γ.map bang ⊢ 0 ; Δ.map quest + 0⟫ :=
+    have h4 : D ⟪{quest A} ; (Γ.map bang).toFinset ⊢ ∅ ; Δ.map quest + 0⟫ :=
       D_outR_all hR _ pol_quest_mem (D_congr h3 (by simp))
-    have h5 := D_outL_all hR _ (pol_bang_mem (Γ := Γ)) (Γ := {quest A}) (Γ' := 0) (Δ' := 0)
+    have h5 := D_outL_all hR _ (pol_bang_mem (Γ := Γ)) (Γ := {quest A}) (Γ' := ∅) (Δ' := ∅)
       (Δ := Δ.map quest) (D_congr h4 (by simp))
     exact D_congr h5 (by simp [← Multiset.singleton_add, add_comm])
   | questD _ ih => exact D_rule1 hR (Rule.questR _ _ _ _ _) (D_rule1 hR (Rule.inR _ _ _ _ _) ih)
@@ -293,7 +300,7 @@ theorem LL.toLU {b : Bool} (hC : b = true → ∀ ps c, CutRule ps c → R ps c)
     exact D_rule1 hR (Rule.questR _ _ _ _ _) (D_rule1 hR (Rule.weakR _ _ _ _ A) ih)
   | @questC _ Γ Δ A _ ih =>
     have h1 := D_rule1 hR (Rule.inR _ _ _ _ _) (D_rule1 hR (Rule.inR _ _ _ _ _) ih)
-    exact D_rule1 hR (Rule.outR _ _ _ _ (quest A) rfl) (D_rule1 hR (Rule.contrR _ _ _ _ _) h1)
+    exact D_rule1 hR (Rule.outR _ _ _ _ (quest A) rfl) (D_congr h1 (by simp))
   | lallR _ ih => exact D_rule1 hR (Rule.lallR _ _ _ _ _) (D_congr ih (by simp))
   | lallL t _ ih => exact D_rule1 hR (Rule.lallL _ _ _ _ _ t) ih
   | lexR t _ ih => exact D_rule1 hR (Rule.lexR _ _ _ _ _ t) ih
@@ -303,13 +310,13 @@ end ToLU
 
 /-- §4: a sequent `Γ ⊢ Δ` provable in linear logic (with cut) is provable in LU as
 `Γ; ⊢ ;Δ`. -/
-theorem LL.provable {Γ Δ : Multiset (Formula n)} (h : LL true Γ Δ) : Provable ⟪Γ ; 0 ⊢ 0 ; Δ⟫ :=
-  LL.toLU (fun _ _ h => Or.inl h) (fun _ _ _ h => Or.inr h) h
+theorem LL.provable {Γ Δ : Multiset (Formula n)} (h : LL true Γ Δ) : Provable ⟪Γ ; ∅ ⊢ ∅ ; Δ⟫ :=
+  LL.toLU (fun _ _ h => Or.inl h) (fun _ {_} _ _ h => Or.inr h) h
 
 /-- §4: a sequent `Γ ⊢ Δ` with a cut-free proof in linear logic has a cut-free proof in LU
 as `Γ; ⊢ ;Δ` ("it is easy to translate proof to proof"). -/
 theorem LL.cutFreeProvable {Γ Δ : Multiset (Formula n)} (h : LL false Γ Δ) :
-    CutFreeProvable ⟪Γ ; 0 ⊢ 0 ; Δ⟫ :=
+    CutFreeProvable ⟪Γ ; ∅ ⊢ ∅ ; Δ⟫ :=
   LL.toLU (fun _ _ h => h) (fun h => absurd h Bool.false_ne_true) h
 
 end LU

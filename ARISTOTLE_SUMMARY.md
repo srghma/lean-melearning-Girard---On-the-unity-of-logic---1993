@@ -1,3 +1,38 @@
+# Summary of changes for run 83044bfd-c794-4b10-b631-1fb5b9ffb9e0
+Both changes are done and the whole project builds. The only `sorry` is still `cut_elimination` in `MainTheorem.lean`.
+
+**On your signature proposal: taking `Func` and `Pred` from an external signature is correct, but the `Term` family as you wrote it is not.** The index `1` is meant to mean "a term", but `cons t nil : Term TS n 1` is also a 1-tuple, so:
+- **An atom has two forms.** For a unary predicate `p`, `atom p (var 0)` and `atom p (cons (var 0) nil)` are two different formulas that both read `p(x)`. This breaks formula equality, the identity rule and the finite-set central zones.
+- **Junk terms exist.** For example `cons (cons (var 0) nil) nil` is accepted as a term.
+- **Matching has to handle it.** Any function on terms must deal with `cons` against `var`/`func`; Lean's coverage check rejects those cases as missing.
+
+Two corrected versions both compile:
+- **(A)** keep the current shape, parameterised by the signature: `func (f : TS.Func) : (Fin (TS.arity f) → Term TS n) → Term TS n`, and atoms take `Fin (PS.arity p) → Term TS n`.
+- **(B)** keep tuples but separate them from terms, e.g. with an `Option ℕ` index (`none` = term, `some k` = `k`-tuple) or a mutual `Tm`/`Tms` pair.
+
+Switching to either would also need:
+- `[DecidableEq TS.Func]` and `[DecidableEq PS.Pred]` instance arguments, because the central zones are finite sets.
+- Dropping the fixed default term: a signature may have no constants, so the one place that uses it (`shift_injective`) needs a renaming-injectivity proof, which I checked works.
+- Restating the concrete atoms in `MultiplicativeReading.lean` and the predicate substitution in `Substitution.lean` over a signature.
+
+The checks are in `RequestProject/SignatureAssessment.lean`: `Proposed.atom_two_representations`, `Proposed.Term.rename_injective`, `FixedA`, `FixedB`, `FixedB.unary_tuple`. It builds without `sorry` and is not imported by the main development. The full write-up is in `SIGNATURE_ASSESSMENT.md`. I haven't changed `Syntax.lean`.
+
+**1. Central zones `CL`, `CR` are now `Finset`s.**
+- **Rules:** a central formula is added with `insert`, empty zones are `∅`, and eigenvariable premises use `shc Γ' = Γ'.image Formula.shift`. `weakR`/`weakL` are kept. `contrR`/`contrL` are commented out in `Calculus.lean` with a note: in a finite set, `insert A (insert A Δ')` is `insert A Δ'`, so contraction is built in.
+- **Statements that changed:**
+  - The LK and LJ translations and the Table 3 soundness theorem now use `S.CL.val` / `S.CR.val`.
+  - `LJ.provable` now concludes `Provable ⟪0 ; Γ.toFinset ⊢ ∅ ; {C}⟫`.
+  - Linear-only sequents are written `⟪Γ ; ∅ ⊢ ∅ ; Δ⟫`.
+- **Proofs:** LK, LJ and the linear-logic side now do the contraction or weakening themselves when a formula enters or leaves a central zone. `shc_val` (with `shift_injective`) moved into `Calculus.lean` so the LJ and LK files can use it.
+
+**2. `Sequent` is indexed by its scope**, as `structure Sequent (n : ℕ)`. Rule premises are `Premise n` (`.same` for scope `n`, `.up` for scope `n + 1` in eigenvariable rules). `Rule`, `CutRule` and `Derivable` follow design (b), with `P : ∀ {n}, Sequent n → Prop`.
+
+I also updated the header of `Calculus.lean` and `LU_FORMALIZATION.md`, removed six unused simp arguments, and updated the Properties table to the new statements; the previously proved results there use only the standard axioms. `ARISTOTLE_SUMMARY.md` is untouched and everything is committed.
+
+## Suggested follow-up
+
+If you like, I can move the whole development to external signatures using the corrected term representation (A) or (B) from `SIGNATURE_ASSESSMENT.md`, and add the decidable-equality instance arguments that the finite-set central zones need.
+
 # Summary of changes for run 22dfe6ee-b07a-465f-8592-5e7605b89f0e
 I wrote `POLARITY_PROPOSAL.md`, a design proposal for deriving polarity instead of taking it as given. I didn't change any Lean code, and I added nothing new to Lean, so the proposal's new claims are not machine-checked.
 

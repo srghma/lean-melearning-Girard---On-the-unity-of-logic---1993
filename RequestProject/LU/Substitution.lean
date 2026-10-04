@@ -201,31 +201,32 @@ theorem Fragment.mem_substPred (F : Fragment) {a : Pred} {A : Formula (n + a.ari
 
 /-- Substitution `S[λx⃗.A / a]` in all formulas of a sequent, the parameters of `A` being
 read through `ρ` in the scope of `S`. -/
-def Sequent.substPredAt (a : Pred) {m : ℕ} (A : Formula (m + a.arity)) (S : Sequent)
-    (ρ : Subst m S.scope) : Sequent :=
-  ⟪S.L.map (Formula.substPredAt a A ρ) ; S.CL.map (Formula.substPredAt a A ρ) ⊢
-    S.CR.map (Formula.substPredAt a A ρ) ; S.R.map (Formula.substPredAt a A ρ)⟫
+def Sequent.substPredAt (a : Pred) {m : ℕ} (A : Formula (m + a.arity)) (S : Sequent n)
+    (ρ : Subst m n) : Sequent n :=
+  ⟪S.L.map (Formula.substPredAt a A ρ) ; S.CL.image (Formula.substPredAt a A ρ) ⊢
+    S.CR.image (Formula.substPredAt a A ρ) ; S.R.map (Formula.substPredAt a A ρ)⟫
 
-/-- `S[λx⃗.A / a]`: substitution in all formulas of a sequent; the first `S.scope` variables of
-`A` are its parameters, read in the scope of `S`. -/
-def Sequent.substPred (S : Sequent) (a : Pred) (A : Formula (S.scope + a.arity)) : Sequent :=
+/-- `S[λx⃗.A / a]`: substitution in all formulas of a sequent; the first `n` variables of
+`A` are its parameters, read in the scope `n` of `S`. -/
+def Sequent.substPred (S : Sequent n) (a : Pred) (A : Formula (n + a.arity)) : Sequent n :=
   S.substPredAt a A Term.var
 
 theorem mu_substPredAt {a : Pred} {m : ℕ} {A : Formula (m + a.arity)} (hA : A.pol = a.pol)
-    (S : Sequent) (ρ : Subst m S.scope) : mu (S.substPredAt a A ρ) = mu S := by
+    (S : Sequent n) (ρ : Subst m n) : mu (S.substPredAt a A ρ) = mu S := by
   simp [mu, Sequent.substPredAt, Multiset.filter_map, Formula.pol_substPredAt hA]
 
 theorem allIn_substPredAt {a : Pred} {m : ℕ} {A : Formula (m + a.arity)}
     {P : ∀ {n : ℕ}, Formula n → Prop}
     (hP : ∀ {n : ℕ} (ρ : Subst m n) (B : Formula n), P B → P (Formula.substPredAt a A ρ B))
-    {S : Sequent} (ρ : Subst m S.scope) (hS : AllIn P S) : AllIn P (S.substPredAt a A ρ) := by
+    {S : Sequent n} (ρ : Subst m n) (hS : AllIn P S) : AllIn P (S.substPredAt a A ρ) := by
   intro B hB
-  simp only [Sequent.formulas, Sequent.substPredAt, Multiset.mem_add, Multiset.mem_map] at hB
+  simp only [Sequent.formulas, Sequent.substPredAt, Multiset.mem_add, Multiset.mem_map,
+    Finset.mem_val, Finset.mem_image] at hB
   rcases hB with ((⟨C, hC, rfl⟩ | ⟨C, hC, rfl⟩) | ⟨C, hC, rfl⟩) | ⟨C, hC, rfl⟩ <;>
     exact hP ρ C (hS C (by simp [Sequent.formulas, hC]))
 
 theorem Fragment.seq_substPredAt (F : Fragment) {a : Pred} {m : ℕ} {A : Formula (m + a.arity)}
-    (hAF : F.Mem A) (hA : A.pol = a.pol) {S : Sequent} (ρ : Subst m S.scope) (hS : F.Seq S) :
+    (hAF : F.Mem A) (hA : A.pol = a.pol) {S : Sequent n} (ρ : Subst m n) (hS : F.Seq S) :
     F.Seq (S.substPredAt a A ρ) := by
   cases F with
   | classical =>
@@ -248,8 +249,8 @@ theorem Fragment.seq_substPredAt (F : Fragment) {a : Pred} {m : ℕ} {A : Formul
 
 /-- If `A` is a formula of the fragment `F` with the polarity of `a`, then substitution maps
 sequents of `F` (e.g. classical sequents) to sequents of `F`. -/
-theorem Fragment.seq_substPred (F : Fragment) {a : Pred} {S : Sequent}
-    {A : Formula (S.scope + a.arity)} (hAF : F.Mem A) (hA : A.pol = a.pol) (hS : F.Seq S) :
+theorem Fragment.seq_substPred (F : Fragment) {a : Pred} {S : Sequent n}
+    {A : Formula (n + a.arity)} (hAF : F.Mem A) (hA : A.pol = a.pol) (hS : F.Seq S) :
     F.Seq (S.substPred a A) :=
   F.seq_substPredAt hAF hA _ hS
 
@@ -261,33 +262,47 @@ theorem map_sh_substPredAt (a : Pred) {m : ℕ} (A : Formula (m + a.arity)) (ρ 
       sh (Γ.map (Formula.substPredAt a A ρ)) := by
   simp only [sh, Multiset.map_map, Function.comp_def, Formula.shift_substPredAt]
 
-/-- The premise-matching relation: `p'` is `p` with the substitution applied at some depth. -/
-abbrev SubstPrem (a : Pred) {m : ℕ} (A : Formula (m + a.arity)) (p' p : Sequent) : Prop :=
-  ∃ ρ : Subst m p.scope, p' = p.substPredAt a A ρ
+theorem image_shc_substPredAt (a : Pred) {m : ℕ} (A : Formula (m + a.arity)) (ρ : Subst m n)
+    (Γ : Finset (Formula n)) :
+    (shc Γ).image (Formula.substPredAt a A (fun i => (ρ i).shift)) =
+      shc (Γ.image (Formula.substPredAt a A ρ)) := by
+  simp only [shc, Finset.image_image, Function.comp_def, Formula.shift_substPredAt]
+
+/-- The premise-matching relation: `p'` is `p` (a premise of the same kind) with the
+substitution applied at some depth. -/
+def SubstPrem (a : Pred) {m : ℕ} (A : Formula (m + a.arity)) : Premise n → Premise n → Prop
+  | .same s', .same s => ∃ ρ : Subst m n, s' = s.substPredAt a A ρ
+  | .up s', .up s => ∃ ρ : Subst m (n + 1), s' = s.substPredAt a A ρ
+  | _, _ => False
 
 local macro "prem_tac " d:term : tactic => `(tactic| (
   repeat' apply List.Forall₂.cons
   all_goals first
     | exact List.Forall₂.nil
-    | (refine ⟨$d, ?_⟩
+    | (dsimp only [SubstPrem]
+       refine ⟨$d, ?_⟩
        simp only [Sequent.substPredAt, Multiset.map_cons, Multiset.map_add,
           Multiset.map_singleton, Multiset.map_zero, Multiset.insert_eq_cons,
+          Finset.image_insert, Finset.image_empty, image_shc_substPredAt,
           Formula.substPredAt, map_sh_substPredAt, Formula.inst_substPredAt]
        done)
-    | (refine ⟨fun i => ($d i).shift, ?_⟩
+    | (dsimp only [SubstPrem]
+       refine ⟨fun i => ($d i).shift, ?_⟩
        simp only [Sequent.substPredAt, Multiset.map_cons, Multiset.map_add,
           Multiset.map_singleton, Multiset.map_zero, Multiset.insert_eq_cons,
+          Finset.image_insert, Finset.image_empty, image_shc_substPredAt,
           Formula.substPredAt, map_sh_substPredAt, Formula.inst_substPredAt]
        done)))
 
 set_option maxHeartbeats 4000000 in
 /-- Each cut-free rule instance is mapped by substitution to a rule instance. -/
 theorem Rule.substPredAt {a : Pred} {m : ℕ} {A : Formula (m + a.arity)} (hA : A.pol = a.pol)
-    {ps : List Sequent} {c : Sequent} (hr : Rule ps c) (ρ : Subst m c.scope) :
+    {ps : List (Premise n)} {c : Sequent n} (hr : Rule ps c) (ρ : Subst m n) :
     ∃ ps', Rule ps' (c.substPredAt a A ρ) ∧ List.Forall₂ (SubstPrem a A) ps' ps := by
   cases hr <;>
     try simp only [Sequent.substPredAt, Multiset.map_cons, Multiset.map_add,
-      Multiset.map_singleton, Multiset.map_zero, Multiset.insert_eq_cons, Formula.substPredAt]
+      Multiset.map_singleton, Multiset.map_zero, Multiset.insert_eq_cons,
+          Finset.image_insert, Finset.image_empty, Formula.substPredAt]
   case ax =>
     apply Exists.intro
     refine ⟨?_, ?_⟩
@@ -302,16 +317,6 @@ theorem Rule.substPredAt {a : Pred} {m : ℕ} {A : Formula (m + a.arity)} (hA : 
     apply Exists.intro
     refine ⟨?_, ?_⟩
     · apply Rule.weakL
-    · prem_tac ρ
-  case contrR =>
-    apply Exists.intro
-    refine ⟨?_, ?_⟩
-    · apply Rule.contrR
-    · prem_tac ρ
-  case contrL =>
-    apply Exists.intro
-    refine ⟨?_, ?_⟩
-    · apply Rule.contrL
     · prem_tac ρ
   case inR =>
     apply Exists.intro
@@ -791,8 +796,8 @@ theorem Rule.substPredAt {a : Pred} {m : ℕ} {A : Formula (m + a.arity)} (hA : 
     · prem_tac ρ
 
 /-- Each cut instance is mapped by substitution to a cut instance. -/
-theorem CutRule.substPredAt {a : Pred} {m : ℕ} {A : Formula (m + a.arity)} {ps : List Sequent}
-    {c : Sequent} (hr : CutRule ps c) (ρ : Subst m c.scope) :
+theorem CutRule.substPredAt {a : Pred} {m : ℕ} {A : Formula (m + a.arity)}
+    {ps : List (Premise n)} {c : Sequent n} (hr : CutRule ps c) (ρ : Subst m n) :
     ∃ ps', CutRule ps' (c.substPredAt a A ρ) ∧ List.Forall₂ (SubstPrem a A) ps' ps := by
   cases hr <;>
     simp only [Sequent.substPredAt, Multiset.map_add]
@@ -822,28 +827,30 @@ theorem forall₂_exists_of_mem_left {α β : Type*} {R : α → β → Prop} {l
     · obtain ⟨y, hy, h⟩ := ih hx
       exact ⟨y, List.mem_cons_of_mem _ hy, h⟩
 
-theorem Derivable.substPredAt {R : List Sequent → Sequent → Prop} {P : Sequent → Prop}
-    {a : Pred} {m : ℕ} {A : Formula (m + a.arity)}
-    (hR : ∀ ps c (ρ : Subst m c.scope), R ps c → ∃ ps', R ps' (c.substPredAt a A ρ) ∧
-      List.Forall₂ (SubstPrem a A) ps' ps)
-    (hP : ∀ S (ρ : Subst m S.scope), P S → P (S.substPredAt a A ρ)) {S : Sequent}
-    (h : Derivable R P S) (ρ : Subst m S.scope) :
+theorem Derivable.substPredAt {R : ∀ {n : ℕ}, List (Premise n) → Sequent n → Prop}
+    {P : ∀ {n : ℕ}, Sequent n → Prop} {a : Pred} {m : ℕ} {A : Formula (m + a.arity)}
+    (hR : ∀ {n : ℕ} (ps : List (Premise n)) (c : Sequent n) (ρ : Subst m n), R ps c →
+      ∃ ps', R ps' (c.substPredAt a A ρ) ∧ List.Forall₂ (SubstPrem a A) ps' ps)
+    (hP : ∀ {n : ℕ} (S : Sequent n) (ρ : Subst m n), P S → P (S.substPredAt a A ρ))
+    {S : Sequent n} (h : Derivable R P S) (ρ : Subst m n) :
     Derivable R P (S.substPredAt a A ρ) := by
   induction h with
-  | mk ps c hr hc _ ih =>
+  | mk ps c hr hc _ _ ihs ihu =>
     obtain ⟨ps', hr', hf⟩ := hR ps c ρ hr
-    refine .mk ps' _ hr' (hP c ρ hc) fun p' hp' => ?_
-    obtain ⟨p, hp, e, rfl⟩ := forall₂_exists_of_mem_left hf hp'
-    exact ih p hp e
+    refine .mk' ps' _ hr' (hP c ρ hc) fun p' hp' => ?_
+    obtain ⟨p, hp, hsub⟩ := forall₂_exists_of_mem_left hf hp'
+    cases p' <;> cases p <;> simp only [SubstPrem] at hsub
+    · obtain ⟨e, rfl⟩ := hsub; exact ihs _ hp e
+    · obtain ⟨e, rfl⟩ := hsub; exact ihu _ hp e
 
 /-- **Substitution preserves cut-free provability**: if `S` has a cut-free proof in LU and
 `A` has the polarity of `a`, then `S[λx⃗.A / a]` has a cut-free proof. -/
-theorem CutFreeProvable.substPred {a : Pred} {S : Sequent} {A : Formula (S.scope + a.arity)}
+theorem CutFreeProvable.substPred {a : Pred} {S : Sequent n} {A : Formula (n + a.arity)}
     (hA : A.pol = a.pol) (h : CutFreeProvable S) : CutFreeProvable (S.substPred a A) :=
   Derivable.substPredAt (fun _ _ ρ hr => hr.substPredAt hA ρ) (fun _ _ _ => trivial) h _
 
 /-- **Substitution preserves provability** in LU (with cut). -/
-theorem Provable.substPred {a : Pred} {S : Sequent} {A : Formula (S.scope + a.arity)}
+theorem Provable.substPred {a : Pred} {S : Sequent n} {A : Formula (n + a.arity)}
     (hA : A.pol = a.pol) (h : Provable S) : Provable (S.substPred a A) :=
   Derivable.substPredAt
     (fun _ _ ρ hr => hr.elim
@@ -854,8 +861,8 @@ theorem Provable.substPred {a : Pred} {S : Sequent} {A : Formula (S.scope + a.ar
 /-- **Substitution preserves provability within a fragment**: if `S` is provable within the
 fragment `F` and `A` is a formula of `F` with the polarity of `a`, then `S[λx⃗.A / a]` is
 provable within `F`. -/
-theorem ProvableWithin.substPred {F : Fragment} {a : Pred} {S : Sequent}
-    {A : Formula (S.scope + a.arity)} (hAF : F.Mem A) (hA : A.pol = a.pol)
+theorem ProvableWithin.substPred {F : Fragment} {a : Pred} {S : Sequent n}
+    {A : Formula (n + a.arity)} (hAF : F.Mem A) (hA : A.pol = a.pol)
     (h : ProvableWithin F S) : ProvableWithin F (S.substPred a A) :=
   Derivable.substPredAt (fun _ _ ρ hr => hr.substPredAt hA ρ)
     (fun _ ρ hS => F.seq_substPredAt hAF hA ρ hS) h _

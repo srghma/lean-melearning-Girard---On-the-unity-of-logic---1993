@@ -35,8 +35,11 @@ Status:
 Transcription choices: syntax is well-scoped by construction — `Term n` and `Formula n` have
 their free variables in `Fin n` (de Bruijn indices; `Formula 0` = closed formulas), function
 and predicate symbols always receive exactly `arity` arguments (`Fin arity → Term n`), and
-quantifier bodies live in `Formula (n + 1)`; a `Sequent` records its scope and its four zones
-are multisets of `Formula scope` (exchange built in); eigenvariable conditions hold by
+quantifier bodies live in `Formula (n + 1)`; sequents are indexed by their scope
+(`Sequent n`), the linear zones are multisets and the central zones finite sets of
+`Formula n` (exchange built in, and central contraction built in, so the two contraction
+rules of Fig. 1 are omitted while weakening is kept); a rule premise is a `Premise n`, i.e. a
+sequent of scope `n` or (eigenvariable rules) `n + 1`, and eigenvariable conditions hold by
 construction (the premise lives in scope `n + 1`, its context is the weakened context); the
 misprinted left rule for `N ⇒ P` (Fig. 3) is taken to be the additive left rule of `N⊥ ⊕ P`
 (Table 3); as in the paper, classical-implication rules with neutral arguments are omitted.

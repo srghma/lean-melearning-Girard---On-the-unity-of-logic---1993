@@ -43,14 +43,14 @@ def atQ : Formula 0 := atom ⟨0, 0, .pos⟩ Fin.elim0
 def atQ' : Formula 0 := atom ⟨1, 0, .pos⟩ Fin.elim0
 
 /-- Left premise `; ⊢ ; ¬q, q`. -/
-def multPrem1 : Sequent := ⟪0 ; 0 ⊢ 0 ; neg atQ ::ₘ {atQ}⟫
+def multPrem1 : Sequent 0 := ⟪0 ; ∅ ⊢ ∅ ; neg atQ ::ₘ {atQ}⟫
 
 /-- Right premise `q', ¬q' ; ⊢ ;` (with `P = q'`, `Λ = ¬q'`; as a multiset,
 `¬q' ::ₘ {q'} = q' ::ₘ {¬q'}`). -/
-def multPrem2 : Sequent := ⟪neg atQ' ::ₘ {atQ'} ; 0 ⊢ 0 ; 0⟫
+def multPrem2 : Sequent 0 := ⟪neg atQ' ::ₘ {atQ'} ; ∅ ⊢ ∅ ; 0⟫
 
 /-- Conclusion of the multiplicative reading: `¬q ⇒ q', ¬q' ; ⊢ ; q`. -/
-def multConcl : Sequent := ⟪imp (neg atQ) atQ' ::ₘ (0 + {neg atQ'}) ; 0 ⊢ 0 ; {atQ} + 0⟫
+def multConcl : Sequent 0 := ⟪imp (neg atQ) atQ' ::ₘ (0 + {neg atQ'}) ; ∅ ⊢ ∅ ; {atQ} + 0⟫
 
 /-- With the multiplicative reading, the paper's invariant for the classical fragment fails:
 both premises are cut-free provable, consist of classical formulas and have `μ = 1`, and
@@ -61,12 +61,12 @@ theorem multiplicative_impL_NP_breaks_mu :
     (neg atQ).pol = .neg ∧ atQ'.pol = .pos ∧
     mu multPrem1 = 1 ∧ mu multPrem2 = 1 ∧ mu multConcl = 2 := by
   refine ⟨?_, ?_, ?_, ?_, ?_, rfl, rfl, ?_, ?_, ?_⟩
-  · refine .mk _ _ (Rule.negR 0 0 0 {atQ} atQ) trivial ?_
+  · refine .mk' _ _ (Rule.negR 0 ∅ ∅ {atQ} atQ) trivial ?_
     simp only [List.mem_singleton, forall_eq]
-    exact .mk _ _ (Rule.ax atQ) trivial (by simp)
-  · refine .mk _ _ (Rule.negL {atQ'} 0 0 0 atQ') trivial ?_
+    exact .mk' _ _ (Rule.ax atQ) trivial (by simp)
+  · refine .mk' _ _ (Rule.negL {atQ'} ∅ ∅ 0 atQ') trivial ?_
     simp only [List.mem_singleton, forall_eq]
-    exact .mk _ _ (Rule.ax atQ') trivial (by simp)
+    exact .mk' _ _ (Rule.ax atQ') trivial (by simp)
   all_goals
     simp [multPrem1, multPrem2, multConcl, AllIn, Sequent.formulas, IsClassical, atQ, atQ',
       mu, Multiset.filter_singleton, pol, Pol.dual, Pol.imp]

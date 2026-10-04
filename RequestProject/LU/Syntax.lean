@@ -223,6 +223,25 @@ theorem shift_subst {n m : ℕ} (σ : Subst n m) (t : Term n) :
     (t.subst σ).shift = t.subst (fun i => (σ i).shift) := by
   simp only [shift, rename_subst]
 
+/-- Decidable equality of terms (by recursion; the arguments of a function symbol are compared
+pointwise, there are finitely many of them). -/
+def decEq {n : ℕ} : (s t : Term n) → Decidable (s = t)
+  | .var i, .var j =>
+    if h : i = j then isTrue (h ▸ rfl) else isFalse (by intro e; cases e; exact h rfl)
+  | .var _, .func _ _ => isFalse (by intro e; cases e)
+  | .func _ _, .var _ => isFalse (by intro e; cases e)
+  | .func f ts, .func g us =>
+    if hf : f = g then by
+      subst hf
+      exact @decidable_of_iff _ _ (by
+        constructor
+        · intro h; exact congrArg _ (funext h)
+        · intro h; cases h; intro i; rfl)
+        (@Fintype.decidableForallFintype _ _ (fun i => decEq (ts i) (us i)) _)
+    else isFalse (by intro e; cases e; exact hf rfl)
+
+instance {n : ℕ} : DecidableEq (Term n) := decEq
+
 end Term
 
 namespace Subst
@@ -320,6 +339,8 @@ inductive Formula : ℕ → Type where
   | call {n : ℕ} : Formula (n + 1) → Formula n
   /-- existential quantifier `∃x A` (classical and intuitionistic) -/
   | cex {n : ℕ} : Formula (n + 1) → Formula n
+
+deriving instance DecidableEq for Formula
 
 /-- Closed formulas (no free variable). -/
 abbrev ClosedFormula := Formula 0

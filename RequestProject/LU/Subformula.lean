@@ -42,7 +42,8 @@ structure SubClosed (F : ∀ {n : ℕ}, Formula n → Prop) : Prop where
   shift : ∀ {n : ℕ} (A : Formula n), F A → F A.shift
   inst : ∀ {n : ℕ} (A : Formula (n + 1)) (t : Term n), F A → F (A.inst t)
 
-theorem allIn_mk {F : ∀ {n : ℕ}, Formula n → Prop} {Γ Γ' Δ' Δ : Multiset (Formula n)} :
+theorem allIn_mk {F : ∀ {n : ℕ}, Formula n → Prop} {Γ Δ : Multiset (Formula n)}
+    {Γ' Δ' : Finset (Formula n)} :
     AllIn F ⟪Γ ; Γ' ⊢ Δ' ; Δ⟫ ↔
       (∀ A ∈ Γ, F A) ∧ (∀ A ∈ Γ', F A) ∧ (∀ A ∈ Δ', F A) ∧ (∀ A ∈ Δ, F A) := by
   simp [AllIn, Sequent.formulas, or_imp, forall_and, and_assoc]
@@ -53,12 +54,21 @@ theorem forall_mem_sh {F : ∀ {n : ℕ}, Formula n → Prop} (hF : SubClosed F)
   obtain ⟨B, hB, rfl⟩ := Multiset.mem_map.1 hA
   exact hF.shift B (h B hB)
 
+theorem forall_mem_shc {F : ∀ {n : ℕ}, Formula n → Prop} (hF : SubClosed F)
+    {Γ : Finset (Formula n)} (h : ∀ A ∈ Γ, F A) : ∀ A ∈ shc Γ, F A := by
+  intro A hA
+  obtain ⟨B, hB, rfl⟩ := Finset.mem_image.1 hA
+  exact hF.shift B (h B hB)
+
 set_option maxHeartbeats 4000000 in
 /-- **Subformula property** of the cut-free rules of LU. -/
-theorem Rule.allIn_premises {F : ∀ {n : ℕ}, Formula n → Prop} (hF : SubClosed F) {ps : List Sequent}
-    {c : Sequent} (hr : Rule ps c) (hc : AllIn F c) : ∀ p ∈ ps, AllIn F p := by
+theorem Rule.allIn_premises {F : ∀ {n : ℕ}, Formula n → Prop} (hF : SubClosed F)
+    {ps : List (Premise n)} {c : Sequent n} (hr : Rule ps c) (hc : AllIn F c) :
+    ∀ p ∈ ps, p.All (AllIn F) := by
   have hsh : ∀ {n : ℕ} (Γ : Multiset (Formula n)), (∀ A ∈ Γ, F A) → ∀ A ∈ sh Γ, F A :=
     fun Γ h => forall_mem_sh hF h
+  have hshc : ∀ {n : ℕ} (Γ : Finset (Formula n)), (∀ A ∈ Γ, F A) → ∀ A ∈ shc Γ, F A :=
+    fun Γ h => forall_mem_shc hF h
   have hneg : ∀ {n : ℕ} (A : Formula n), F (neg A) → F A := hF.neg
   have hbang : ∀ {n : ℕ} (A : Formula n), F (bang A) → F A := hF.bang
   have hquest : ∀ {n : ℕ} (A : Formula n), F (quest A) → F A := hF.quest
@@ -104,8 +114,9 @@ theorem Rule.allIn_premises {F : ∀ {n : ℕ}, Formula n → Prop} (hF : SubClo
   have hcex : ∀ {n : ℕ} (A : Formula (n + 1)), F (cex A) → F A := hF.cex
   have hinst : ∀ {n : ℕ} (A : Formula (n + 1)) (t : Term n), F A → F (A.inst t) := hF.inst
   cases hr <;>
-    simp only [allIn_mk, List.mem_cons, List.not_mem_nil, Multiset.mem_cons,
+    simp only [allIn_mk, Premise.all_same, Premise.all_up, List.mem_cons, List.not_mem_nil, Multiset.mem_cons,
       Multiset.mem_singleton, Multiset.mem_add, Multiset.notMem_zero, or_imp, forall_and,
+      Finset.mem_insert, Finset.notMem_empty,
       Multiset.insert_eq_cons,
       forall_eq, or_false, IsEmpty.forall_iff, implies_true,
       true_and, and_true] at hc ⊢ <;>
@@ -114,6 +125,7 @@ theorem Rule.allIn_premises {F : ∀ {n : ℕ}, Formula n → Prop} (hF : SubClo
     first
     | assumption
     | exact hsh _ ‹_›
+    | exact hshc _ ‹_›
     | (apply hneg; assumption)
     | (apply hbang; assumption)
     | (apply hquest; assumption)
@@ -147,12 +159,13 @@ theorem Rule.allIn_premises {F : ∀ {n : ℕ}, Formula n → Prop} (hF : SubClo
 
 /-- In a cut-free derivation whose conclusion has all its formulas in a closed class `F`,
 every sequent has all its formulas in `F`. -/
-theorem Derivable.allIn {F : ∀ {n : ℕ}, Formula n → Prop} (hF : SubClosed F) {P : Sequent → Prop}
-    {S : Sequent} (h : Derivable Rule P S) (hS : AllIn F S) :
+theorem Derivable.allIn {F : ∀ {n : ℕ}, Formula n → Prop} (hF : SubClosed F)
+    {P : ∀ {n : ℕ}, Sequent n → Prop} {S : Sequent n} (h : Derivable Rule P S) (hS : AllIn F S) :
     Derivable Rule (fun S => P S ∧ AllIn F S) S := by
   induction h with
-  | mk ps c hr hc _ ih =>
-    exact .mk ps c hr ⟨hc, hS⟩ fun p hp => ih p hp (hr.allIn_premises hF hS p hp)
+  | mk ps c hr hc _ _ ihs ihu =>
+    exact .mk ps c hr ⟨hc, hS⟩ (fun s hs => ihs s hs (hr.allIn_premises hF hS _ hs))
+      (fun s hs => ihu s hs (hr.allIn_premises hF hS _ hs))
 
 namespace Formula
 

@@ -72,61 +72,62 @@ end Formula
 abbrev NR (Δ : Multiset (Formula n)) : Multiset (Formula n) := Δ.filter (fun A => A.nrem = true)
 
 /-- Shape of the sequents occurring in a cut-free proof of an intuitionistic sequent. -/
-def IntShape (S : Sequent) : Prop := AllIn IsIntuitionistic S ∧ S.CR = 0
+def IntShape (S : Sequent n) : Prop := AllIn IsIntuitionistic S ∧ S.CR = ∅
 
-theorem IntShape.cr_eq {L C CR R : Multiset (Formula n)} (h : IntShape ⟪L ; C ⊢ CR ; R⟫) :
-    CR = 0 := h.2
+theorem IntShape.cr_eq {L R : Multiset (Formula n)} {C CR : Finset (Formula n)}
+    (h : IntShape ⟪L ; C ⊢ CR ; R⟫) : CR = ∅ := h.2
 
 /-- Provability within the intuitionistic fragment. -/
-abbrev IntWithin (S : Sequent) : Prop := ProvableWithin .intuitionistic S
+abbrev IntWithin (S : Sequent n) : Prop := ProvableWithin .intuitionistic S
 
 /-- The invariant proved by induction on a cut-free proof. -/
-def IntGood (S : Sequent) : Prop :=
+def IntGood (S : Sequent n) : Prop :=
   (Multiset.card S.R = 1 → IntWithin S) ∧
-  (Multiset.card S.R ≠ 1 → ∀ TL TC TR : Multiset (Formula S.scope),
-    IntSeq ⟪TL ; TC ⊢ 0 ; TR⟫ → S.L ≤ TL → S.CL ≤ TC → NR S.R ≤ TR →
-      IntWithin ⟪TL ; TC ⊢ 0 ; TR⟫)
+  (Multiset.card S.R ≠ 1 → ∀ (TL : Multiset (Formula n)) (TC : Finset (Formula n))
+    (TR : Multiset (Formula n)),
+    IntSeq ⟪TL ; TC ⊢ ∅ ; TR⟫ → S.L ≤ TL → S.CL ⊆ TC → NR S.R ≤ TR →
+      IntWithin ⟪TL ; TC ⊢ ∅ ; TR⟫)
 
-theorem IntWithin.intSeq {S : Sequent} (h : IntWithin S) : IntSeq S := by
+theorem IntWithin.intSeq {S : Sequent n} (h : IntWithin S) : IntSeq S := by
   cases h with
   | mk _ _ _ h _ => exact h
 
-theorem within_rule {ps : List Sequent} {c T : Sequent} (hr : Rule ps c) (heq : c = T)
-    (hT : IntSeq T) (hps : ∀ p ∈ ps, IntWithin p) : IntWithin T := by
-  subst heq; exact .mk ps c hr hT hps
+theorem within_rule {ps : List (Premise n)} {c T : Sequent n} (hr : Rule ps c) (heq : c = T)
+    (hT : IntSeq T) (hps : ∀ p ∈ ps, p.All IntWithin) : IntWithin T := by
+  subst heq; exact .mk' ps c hr hT hps
 
-theorem within_weakCL {L C R : Multiset (Formula n)} (E : Multiset (Formula n))
-    (h : IntWithin ⟪L ; C ⊢ 0 ; R⟫) (hE : ∀ A ∈ E, A.IsIntuitionistic) :
-    IntWithin ⟪L ; C + E ⊢ 0 ; R⟫ := by
-  induction E using Multiset.induction with
+theorem within_weakCL {L R : Multiset (Formula n)} {C : Finset (Formula n)}
+    (E : Finset (Formula n))
+    (h : IntWithin ⟪L ; C ⊢ ∅ ; R⟫) (hE : ∀ A ∈ E, A.IsIntuitionistic) :
+    IntWithin ⟪L ; C ∪ E ⊢ ∅ ; R⟫ := by
+  induction E using Finset.induction_on with
   | empty => simpa using h
-  | cons A E ih =>
-    have ih' := ih (fun B hB => hE B (Multiset.mem_cons_of_mem hB))
+  | insert A E _ ih =>
+    have ih' := ih (fun B hB => hE B (Finset.mem_insert_of_mem hB))
     have hs := ih'.intSeq
-    refine within_rule (Rule.weakL L (C + E) 0 R A) (by simp) ?_ (by simpa using ih')
+    refine within_rule (Rule.weakL L (C ∪ E) ∅ R A) (by simp) ?_ (by simpa using ih')
     obtain ⟨h1, h2, h3⟩ := hs
     refine ⟨?_, rfl, h3⟩
     simp only [allIn_mk] at h1 ⊢
     refine ⟨h1.1, ?_, h1.2.2⟩
     intro B hB
-    simp only [Multiset.add_cons, Multiset.mem_cons] at hB
+    simp only [Finset.union_insert, Finset.mem_insert] at hB
     rcases hB with rfl | hB
-    · exact hE _ (Multiset.mem_cons_self _ _)
+    · exact hE _ (Finset.mem_insert_self _ _)
     · exact h1.2.1 B hB
 
-theorem within_weakCL' {L C R TC : Multiset (Formula n)}
-    (h : IntWithin ⟪L ; C ⊢ 0 ; R⟫) (hT : IntSeq ⟪L ; TC ⊢ 0 ; R⟫) (hC : C ≤ TC) :
-    IntWithin ⟪L ; TC ⊢ 0 ; R⟫ := by
-  obtain ⟨E, rfl⟩ := Multiset.le_iff_exists_add.1 hC
+theorem within_weakCL' {L R : Multiset (Formula n)} {C TC : Finset (Formula n)}
+    (h : IntWithin ⟪L ; C ⊢ ∅ ; R⟫) (hT : IntSeq ⟪L ; TC ⊢ ∅ ; R⟫) (hC : C ⊆ TC) :
+    IntWithin ⟪L ; TC ⊢ ∅ ; R⟫ := by
   obtain ⟨hA, -, _⟩ := hT
-  apply within_weakCL E h
-  intro A hA'
-  exact hA A (by simp [Sequent.formulas, hA'])
+  have := within_weakCL TC h fun A hA' => hA A (by simp [Sequent.formulas, hA'])
+  rwa [Finset.union_eq_right.2 hC] at this
 
 /-- Absorption: a target of the conclusion is a target of a premise. -/
-theorem IntGood.absorb {p : Sequent} {TL TC TR : Multiset (Formula p.scope)} (hp : IntGood p)
-    (hcard : Multiset.card p.R ≠ 1) (hT : IntSeq ⟪TL ; TC ⊢ 0 ; TR⟫) (hL : p.L ≤ TL)
-    (hC : p.CL ≤ TC) (hR : NR p.R ≤ TR) : IntWithin ⟪TL ; TC ⊢ 0 ; TR⟫ :=
+theorem IntGood.absorb {p : Sequent n} {TL TR : Multiset (Formula n)} {TC : Finset (Formula n)}
+    (hp : IntGood p)
+    (hcard : Multiset.card p.R ≠ 1) (hT : IntSeq ⟪TL ; TC ⊢ ∅ ; TR⟫) (hL : p.L ≤ TL)
+    (hC : p.CL ⊆ TC) (hR : NR p.R ≤ TR) : IntWithin ⟪TL ; TC ⊢ ∅ ; TR⟫ :=
   hp.2 hcard TL TC TR hT hL hC hR
 
 end LU
@@ -135,30 +136,35 @@ namespace LU
 
 open Formula
 
-theorem intSeq_mk {L C : Multiset (Formula n)} {Z : Formula n} (hL : ∀ A ∈ L, A.IsIntuitionistic)
-    (hC : ∀ A ∈ C, A.IsIntuitionistic) (hZ : Z.IsIntuitionistic) : IntSeq ⟪L ; C ⊢ 0 ; {Z}⟫ :=
+/-- Inclusion of central zones `C ∪ Γ' ⊆ C ∪ (Γ' ∪ E)` (also under `shc`). -/
+local macro "csub" : term =>
+  `(by simp only [Finset.image_union, ← Finset.union_assoc]; exact Finset.subset_union_left)
+
+theorem intSeq_mk {L : Multiset (Formula n)} {C : Finset (Formula n)} {Z : Formula n}
+    (hL : ∀ A ∈ L, A.IsIntuitionistic)
+    (hC : ∀ A ∈ C, A.IsIntuitionistic) (hZ : Z.IsIntuitionistic) : IntSeq ⟪L ; C ⊢ ∅ ; {Z}⟫ :=
   ⟨allIn_mk.2 ⟨hL, hC, by simp, by simpa using hZ⟩, rfl, by simp⟩
 
-theorem tgt_decomp {TL TC TR L C : Multiset (Formula n)} (hT : IntSeq ⟪TL ; TC ⊢ 0 ; TR⟫)
-    (hL : L ≤ TL) (hC : C ≤ TC) :
-    ∃ E E' Z, TL = L + E ∧ TC = C + E' ∧ TR = {Z} ∧ (∀ A ∈ E, A.IsIntuitionistic) ∧
+theorem tgt_decomp {TL TR L : Multiset (Formula n)} {TC C : Finset (Formula n)}
+    (hT : IntSeq ⟪TL ; TC ⊢ ∅ ; TR⟫) (hL : L ≤ TL) (hC : C ⊆ TC) :
+    ∃ E E' Z, TL = L + E ∧ TC = C ∪ E' ∧ TR = {Z} ∧ (∀ A ∈ E, A.IsIntuitionistic) ∧
       (∀ A ∈ E', A.IsIntuitionistic) ∧ Z.IsIntuitionistic := by
   obtain ⟨E, rfl⟩ := Multiset.le_iff_exists_add.1 hL
-  obtain ⟨E', rfl⟩ := Multiset.le_iff_exists_add.1 hC
   obtain ⟨hA, -, h1⟩ := hT
   obtain ⟨Z, rfl⟩ := Multiset.card_eq_one.1 (show Multiset.card TR = 1 from h1)
   simp only [allIn_mk, Multiset.mem_add, or_imp, forall_and, Multiset.mem_singleton,
     forall_eq] at hA
-  exact ⟨E, E', Z, rfl, rfl, rfl, hA.1.2, hA.2.1.2, hA.2.2.2⟩
+  exact ⟨E, TC, Z, rfl, (Finset.union_eq_right.2 hC).symm, rfl, hA.1.2, hA.2.1, hA.2.2.2⟩
 
 theorem forall_mem_sh' {Γ : Multiset (Formula n)} (h : ∀ A ∈ Γ, A.IsIntuitionistic) :
     ∀ A ∈ sh Γ, A.IsIntuitionistic := forall_mem_sh subClosed_intuitionistic h
 
 /-- Rules whose conclusion has exactly one formula on the right, as well as all premises. -/
-theorem good_card1 {ps : List Sequent} {c : Sequent} (hr : Rule ps c) (hc : IntShape c)
-    (h1 : Multiset.card c.R = 1) (hall : ∀ p ∈ ps, Multiset.card p.R = 1)
-    (ih : ∀ p ∈ ps, IntGood p) : IntGood c :=
-  ⟨fun _ => within_rule hr rfl ⟨hc.1, hc.2, h1⟩ fun p hp => (ih p hp).1 (hall p hp),
+theorem good_card1 {ps : List (Premise n)} {c : Sequent n} (hr : Rule ps c) (hc : IntShape c)
+    (h1 : Multiset.card c.R = 1) (hall : ∀ p ∈ ps, p.All (fun s => Multiset.card s.R = 1))
+    (ih : ∀ p ∈ ps, p.All IntGood) : IntGood c :=
+  ⟨fun _ => within_rule hr rfl ⟨hc.1, hc.2, h1⟩ fun p hp =>
+      ((ih p hp).imp fun _ h => h.1).mp (hall p hp),
     fun h => absurd h1 h⟩
 
 theorem NR_cons_of_rem {A : Formula n} (hA : A.nrem = false) (Δ : Multiset (Formula n)) :
@@ -170,75 +176,76 @@ theorem NR_cons_of_nrem {A : Formula n} (hA : A.nrem = true) (Δ : Multiset (For
   simp [hA]
 
 /-- One-premise right rules whose principal formula is removable. -/
-theorem good_right_rem {Γ Γ' Δ : Multiset (Formula n)} {A C : Formula n}
-    (hr : Rule [⟪Γ ; Γ' ⊢ 0 ; A ::ₘ Δ⟫] ⟪Γ ; Γ' ⊢ 0 ; C ::ₘ Δ⟫)
-    (hc : IntShape ⟪Γ ; Γ' ⊢ 0 ; C ::ₘ Δ⟫) (hA : A.nrem = false) (hCn : C.nrem = false)
-    (ih : IntGood ⟪Γ ; Γ' ⊢ 0 ; A ::ₘ Δ⟫) : IntGood ⟪Γ ; Γ' ⊢ 0 ; C ::ₘ Δ⟫ := by
+theorem good_right_rem {Γ Δ : Multiset (Formula n)} {Γ' : Finset (Formula n)} {A C : Formula n}
+    (hr : Rule [.same ⟪Γ ; Γ' ⊢ ∅ ; A ::ₘ Δ⟫] ⟪Γ ; Γ' ⊢ ∅ ; C ::ₘ Δ⟫)
+    (hc : IntShape ⟪Γ ; Γ' ⊢ ∅ ; C ::ₘ Δ⟫) (hA : A.nrem = false) (hCn : C.nrem = false)
+    (ih : IntGood ⟪Γ ; Γ' ⊢ ∅ ; A ::ₘ Δ⟫) : IntGood ⟪Γ ; Γ' ⊢ ∅ ; C ::ₘ Δ⟫ := by
   refine ⟨fun h1 => within_rule hr rfl ⟨hc.1, hc.2, h1⟩ (by simpa using ih.1 (by simpa using h1)),
-    fun h1 (TL TC TR : Multiset (Formula n)) hT hL hC hR => ih.absorb (by simpa using h1) hT hL hC ?_⟩
+    fun h1 TL TC TR hT hL hC hR => ih.absorb (by simpa using h1) hT hL hC ?_⟩
   simpa [NR_cons_of_rem hA, NR_cons_of_rem hCn] using hR
 
 /-- One-premise left (or structural) rules keeping the right-hand side. -/
-theorem good_left1 {Γ Γ' Δ L0 C0 L1 C1 : Multiset (Formula n)}
-    (hr : ∀ Γ Γ' Δ, Rule [⟪L1 + Γ ; C1 + Γ' ⊢ 0 ; Δ⟫] ⟪L0 + Γ ; C0 + Γ' ⊢ 0 ; Δ⟫)
-    (hc : IntShape ⟪L0 + Γ ; C0 + Γ' ⊢ 0 ; Δ⟫) (hp : IntShape ⟪L1 + Γ ; C1 + Γ' ⊢ 0 ; Δ⟫)
-    (ih : IntGood ⟪L1 + Γ ; C1 + Γ' ⊢ 0 ; Δ⟫) : IntGood ⟪L0 + Γ ; C0 + Γ' ⊢ 0 ; Δ⟫ := by
+theorem good_left1 {Γ Δ L0 L1 : Multiset (Formula n)} {Γ' C0 C1 : Finset (Formula n)}
+    (hr : ∀ Γ Γ' Δ, Rule [.same ⟪L1 + Γ ; C1 ∪ Γ' ⊢ ∅ ; Δ⟫] ⟪L0 + Γ ; C0 ∪ Γ' ⊢ ∅ ; Δ⟫)
+    (hc : IntShape ⟪L0 + Γ ; C0 ∪ Γ' ⊢ ∅ ; Δ⟫) (hp : IntShape ⟪L1 + Γ ; C1 ∪ Γ' ⊢ ∅ ; Δ⟫)
+    (ih : IntGood ⟪L1 + Γ ; C1 ∪ Γ' ⊢ ∅ ; Δ⟫) : IntGood ⟪L0 + Γ ; C0 ∪ Γ' ⊢ ∅ ; Δ⟫ := by
   refine ⟨fun h1 => within_rule (hr Γ Γ' Δ) rfl ⟨hc.1, hc.2, h1⟩ (by simpa using ih.1 h1),
-    fun h1 (TL TC TR : Multiset (Formula n)) hT hL hC hR => ?_⟩
+    fun h1 TL TC TR hT hL hC hR => ?_⟩
   obtain ⟨E, E', Z, rfl, rfl, rfl, hE, hE', hZ⟩ := tgt_decomp (n := n) hT hL hC
   have hpA := allIn_mk.1 hp.1
   have hcA := allIn_mk.1 hc.1
-  simp only [Multiset.mem_add, or_imp, forall_and] at hpA hcA
-  refine within_rule (hr (Γ + E) (Γ' + E') {Z}) (by simp [add_assoc]) hT ?_
+  simp only [Multiset.mem_add, Finset.mem_union, or_imp, forall_and] at hpA hcA
+  refine within_rule (hr (Γ + E) (Γ' ∪ E') {Z}) (by simp [add_assoc, Finset.union_assoc]) hT ?_
   simp only [List.mem_singleton, forall_eq]
-  refine ih.2 h1 _ _ _ (intSeq_mk ?_ ?_ hZ) (by simp) (by simp) (by simpa using hR)
+  refine ih.2 h1 _ _ _ (intSeq_mk ?_ ?_ hZ) (by simp) csub (by simpa using hR)
   · simp only [Multiset.mem_add, or_imp, forall_and]; exact ⟨hpA.1.1, hpA.1.2, hE⟩
-  · simp only [Multiset.mem_add, or_imp, forall_and]; exact ⟨hpA.2.1.1, hpA.2.1.2, hE'⟩
+  · simp only [Finset.mem_union, or_imp, forall_and]; exact ⟨hpA.2.1.1, hpA.2.1.2, hE'⟩
 
 /-- Two-premise additive left rules keeping the right-hand side. -/
-theorem good_left2 {Γ Γ' Δ L0 C0 L1 C1 L2 C2 : Multiset (Formula n)}
-    (hr : ∀ Γ Γ' Δ, Rule [⟪L1 + Γ ; C1 + Γ' ⊢ 0 ; Δ⟫, ⟪L2 + Γ ; C2 + Γ' ⊢ 0 ; Δ⟫]
-      ⟪L0 + Γ ; C0 + Γ' ⊢ 0 ; Δ⟫)
-    (hc : IntShape ⟪L0 + Γ ; C0 + Γ' ⊢ 0 ; Δ⟫) (hp1 : IntShape ⟪L1 + Γ ; C1 + Γ' ⊢ 0 ; Δ⟫)
-    (hp2 : IntShape ⟪L2 + Γ ; C2 + Γ' ⊢ 0 ; Δ⟫)
-    (ih1 : IntGood ⟪L1 + Γ ; C1 + Γ' ⊢ 0 ; Δ⟫) (ih2 : IntGood ⟪L2 + Γ ; C2 + Γ' ⊢ 0 ; Δ⟫) :
-    IntGood ⟪L0 + Γ ; C0 + Γ' ⊢ 0 ; Δ⟫ := by
+theorem good_left2 {Γ Δ L0 L1 L2 : Multiset (Formula n)} {Γ' C0 C1 C2 : Finset (Formula n)}
+    (hr : ∀ Γ Γ' Δ, Rule [.same ⟪L1 + Γ ; C1 ∪ Γ' ⊢ ∅ ; Δ⟫, .same ⟪L2 + Γ ; C2 ∪ Γ' ⊢ ∅ ; Δ⟫]
+      ⟪L0 + Γ ; C0 ∪ Γ' ⊢ ∅ ; Δ⟫)
+    (hc : IntShape ⟪L0 + Γ ; C0 ∪ Γ' ⊢ ∅ ; Δ⟫) (hp1 : IntShape ⟪L1 + Γ ; C1 ∪ Γ' ⊢ ∅ ; Δ⟫)
+    (hp2 : IntShape ⟪L2 + Γ ; C2 ∪ Γ' ⊢ ∅ ; Δ⟫)
+    (ih1 : IntGood ⟪L1 + Γ ; C1 ∪ Γ' ⊢ ∅ ; Δ⟫) (ih2 : IntGood ⟪L2 + Γ ; C2 ∪ Γ' ⊢ ∅ ; Δ⟫) :
+    IntGood ⟪L0 + Γ ; C0 ∪ Γ' ⊢ ∅ ; Δ⟫ := by
   refine ⟨fun h1 => within_rule (hr Γ Γ' Δ) rfl ⟨hc.1, hc.2, h1⟩
-    (by simpa using ⟨ih1.1 h1, ih2.1 h1⟩), fun h1 (TL TC TR : Multiset (Formula n)) hT hL hC hR => ?_⟩
+    (by simpa using ⟨ih1.1 h1, ih2.1 h1⟩), fun h1 TL TC TR hT hL hC hR => ?_⟩
   obtain ⟨E, E', Z, rfl, rfl, rfl, hE, hE', hZ⟩ := tgt_decomp (n := n) hT hL hC
   have hpA := allIn_mk.1 hp1.1
   have hpA2 := allIn_mk.1 hp2.1
-  simp only [Multiset.mem_add, or_imp, forall_and] at hpA hpA2
-  refine within_rule (hr (Γ + E) (Γ' + E') {Z}) (by simp [add_assoc]) hT ?_
+  simp only [Multiset.mem_add, Finset.mem_union, or_imp, forall_and] at hpA hpA2
+  refine within_rule (hr (Γ + E) (Γ' ∪ E') {Z}) (by simp [add_assoc, Finset.union_assoc]) hT ?_
   simp only [List.mem_cons, List.not_mem_nil, or_false, forall_eq_or_imp, forall_eq]
-  refine ⟨ih1.2 h1 _ _ _ (intSeq_mk ?_ ?_ hZ) (by simp) (by simp) (by simpa using hR),
-    ih2.2 h1 _ _ _ (intSeq_mk ?_ ?_ hZ) (by simp) (by simp) (by simpa using hR)⟩
+  refine ⟨ih1.2 h1 _ _ _ (intSeq_mk ?_ ?_ hZ) (by simp) csub (by simpa using hR),
+    ih2.2 h1 _ _ _ (intSeq_mk ?_ ?_ hZ) (by simp) csub (by simpa using hR)⟩
   · simp only [Multiset.mem_add, or_imp, forall_and]; exact ⟨hpA.1.1, hpA.1.2, hE⟩
-  · simp only [Multiset.mem_add, or_imp, forall_and]; exact ⟨hpA.2.1.1, hpA.2.1.2, hE'⟩
+  · simp only [Finset.mem_union, or_imp, forall_and]; exact ⟨hpA.2.1.1, hpA.2.1.2, hE'⟩
   · simp only [Multiset.mem_add, or_imp, forall_and]; exact ⟨hpA2.1.1, hpA2.1.2, hE⟩
-  · simp only [Multiset.mem_add, or_imp, forall_and]; exact ⟨hpA2.2.1.1, hpA2.2.1.2, hE'⟩
+  · simp only [Finset.mem_union, or_imp, forall_and]; exact ⟨hpA2.2.1.1, hpA2.2.1.2, hE'⟩
 
 theorem NR_sh (Δ : Multiset (Formula n)) : NR (sh Δ) = sh (NR Δ) := by
   simp [Multiset.filter_map]
 
 /-- One-premise left rules with an eigenvariable (context weakened into the scope `n + 1`). -/
-theorem good_left_sh {Γ Γ' Δ L0 C0 : Multiset (Formula n)} {L1 C1 : Multiset (Formula (n + 1))}
-    (hr : ∀ Γ Γ' Δ, Rule [⟪L1 + sh Γ ; C1 + sh Γ' ⊢ 0 ; sh Δ⟫] ⟪L0 + Γ ; C0 + Γ' ⊢ 0 ; Δ⟫)
-    (hc : IntShape ⟪L0 + Γ ; C0 + Γ' ⊢ 0 ; Δ⟫)
-    (hp : IntShape ⟪L1 + sh Γ ; C1 + sh Γ' ⊢ 0 ; sh Δ⟫)
-    (ih : IntGood ⟪L1 + sh Γ ; C1 + sh Γ' ⊢ 0 ; sh Δ⟫) : IntGood ⟪L0 + Γ ; C0 + Γ' ⊢ 0 ; Δ⟫ := by
+theorem good_left_sh {Γ Δ L0 : Multiset (Formula n)} {Γ' C0 : Finset (Formula n)}
+    {L1 : Multiset (Formula (n + 1))} {C1 : Finset (Formula (n + 1))}
+    (hr : ∀ Γ Γ' Δ, Rule [.up ⟪L1 + sh Γ ; C1 ∪ shc Γ' ⊢ ∅ ; sh Δ⟫] ⟪L0 + Γ ; C0 ∪ Γ' ⊢ ∅ ; Δ⟫)
+    (hc : IntShape ⟪L0 + Γ ; C0 ∪ Γ' ⊢ ∅ ; Δ⟫)
+    (hp : IntShape ⟪L1 + sh Γ ; C1 ∪ shc Γ' ⊢ ∅ ; sh Δ⟫)
+    (ih : IntGood ⟪L1 + sh Γ ; C1 ∪ shc Γ' ⊢ ∅ ; sh Δ⟫) : IntGood ⟪L0 + Γ ; C0 ∪ Γ' ⊢ ∅ ; Δ⟫ := by
   refine ⟨fun h1 => within_rule (hr Γ Γ' Δ) rfl ⟨hc.1, hc.2, h1⟩
-    (by simpa using ih.1 (by simpa using h1)), fun h1 (TL TC TR : Multiset (Formula n)) hT hL hC hR => ?_⟩
+    (by simpa using ih.1 (by simpa using h1)), fun h1 TL TC TR hT hL hC hR => ?_⟩
   obtain ⟨E, E', Z, rfl, rfl, rfl, hE, hE', hZ⟩ := tgt_decomp (n := n) hT hL hC
   have hpA := allIn_mk.1 hp.1
-  simp only [Multiset.mem_add, or_imp, forall_and] at hpA
-  refine within_rule (hr (Γ + E) (Γ' + E') {Z}) (by simp [add_assoc]) hT ?_
+  simp only [Multiset.mem_add, Finset.mem_union, or_imp, forall_and] at hpA
+  refine within_rule (hr (Γ + E) (Γ' ∪ E') {Z}) (by simp [add_assoc, Finset.union_assoc]) hT ?_
   simp only [List.mem_singleton, forall_eq]
-  refine ih.2 (by simpa using h1) _ _ _ (intSeq_mk ?_ ?_ ?_) (by simp) (by simp) ?_
+  refine ih.2 (by simpa using h1) _ _ _ (intSeq_mk ?_ ?_ ?_) (by simp) csub ?_
   · simp only [Multiset.map_add, Multiset.mem_add, or_imp, forall_and]
     exact ⟨hpA.1.1, hpA.1.2, forall_mem_sh' hE⟩
-  · simp only [Multiset.map_add, Multiset.mem_add, or_imp, forall_and]
-    exact ⟨hpA.2.1.1, hpA.2.1.2, forall_mem_sh' hE'⟩
+  · simp only [Finset.image_union, Finset.mem_union, or_imp, forall_and]
+    exact ⟨hpA.2.1.1, hpA.2.1.2, forall_mem_shc subClosed_intuitionistic hE'⟩
   · exact subClosed_intuitionistic.shift _ hZ
   · rw [NR_sh]; simpa using Multiset.map_le_map (f := Formula.shift) hR
 
@@ -257,22 +264,24 @@ theorem NR_cons_le (A : Formula n) (Δ : Multiset (Formula n)) : NR (A ::ₘ Δ)
   · rw [NR_cons_of_nrem h]
 
 /-- One-premise right rules whose principal formula is not removable. -/
-theorem good_right_nrem {Γ Γ' Δ L1 C1 : Multiset (Formula n)} {A C : Formula n}
-    (hr : ∀ Γ Γ' Δ, Rule [⟪L1 + Γ ; C1 + Γ' ⊢ 0 ; A ::ₘ Δ⟫] ⟪Γ ; Γ' ⊢ 0 ; C ::ₘ Δ⟫)
+theorem good_right_nrem {Γ Δ L1 : Multiset (Formula n)} {Γ' C1 : Finset (Formula n)}
+    {A C : Formula n}
+    (hr : ∀ Γ Γ' Δ, Rule [.same ⟪L1 + Γ ; C1 ∪ Γ' ⊢ ∅ ; A ::ₘ Δ⟫] ⟪Γ ; Γ' ⊢ ∅ ; C ::ₘ Δ⟫)
     (hCn : C.nrem = true)
-    (hc : IntShape ⟪Γ ; Γ' ⊢ 0 ; C ::ₘ Δ⟫) (hp : IntShape ⟪L1 + Γ ; C1 + Γ' ⊢ 0 ; A ::ₘ Δ⟫)
-    (ih : IntGood ⟪L1 + Γ ; C1 + Γ' ⊢ 0 ; A ::ₘ Δ⟫) : IntGood ⟪Γ ; Γ' ⊢ 0 ; C ::ₘ Δ⟫ := by
+    (hc : IntShape ⟪Γ ; Γ' ⊢ ∅ ; C ::ₘ Δ⟫) (hp : IntShape ⟪L1 + Γ ; C1 ∪ Γ' ⊢ ∅ ; A ::ₘ Δ⟫)
+    (ih : IntGood ⟪L1 + Γ ; C1 ∪ Γ' ⊢ ∅ ; A ::ₘ Δ⟫) : IntGood ⟪Γ ; Γ' ⊢ ∅ ; C ::ₘ Δ⟫ := by
   refine ⟨fun h1 => within_rule (hr Γ Γ' Δ) rfl ⟨hc.1, hc.2, h1⟩
-    (by simpa using ih.1 (by simpa using h1)), fun h1 (TL TC TR : Multiset (Formula n)) hT hL hC hR => ?_⟩
+    (by simpa using ih.1 (by simpa using h1)), fun h1 TL TC TR hT hL hC hR => ?_⟩
   obtain ⟨E, E', Z, rfl, rfl, rfl, hE, hE', hZ⟩ := tgt_decomp (n := n) hT hL hC
   obtain ⟨rfl, h0⟩ := NR_le_single_of_nrem hCn hR
   have hpA := allIn_mk.1 hp.1
-  simp only [Multiset.mem_add, Multiset.mem_cons, or_imp, forall_and, forall_eq] at hpA
-  refine within_rule (hr (Γ + E) (Γ' + E') 0) (by simp) hT ?_
+  simp only [Multiset.mem_add, Finset.mem_union, Multiset.mem_cons, or_imp, forall_and,
+    forall_eq] at hpA
+  refine within_rule (hr (Γ + E) (Γ' ∪ E') 0) (by simp) hT ?_
   simp only [List.mem_singleton, forall_eq]
-  refine ih.2 (by simpa using h1) _ _ _ (intSeq_mk ?_ ?_ hpA.2.2.2.1) (by simp) (by simp) ?_
+  refine ih.2 (by simpa using h1) _ _ _ (intSeq_mk ?_ ?_ hpA.2.2.2.1) (by simp) csub ?_
   · simp only [Multiset.mem_add, or_imp, forall_and]; exact ⟨hpA.1.1, hpA.1.2, hE⟩
-  · simp only [Multiset.mem_add, or_imp, forall_and]; exact ⟨hpA.2.1.1, hpA.2.1.2, hE'⟩
+  · simp only [Finset.mem_union, or_imp, forall_and]; exact ⟨hpA.2.1.1, hpA.2.1.2, hE'⟩
   · simpa [h0] using NR_cons_le A Δ
 
 end LU
