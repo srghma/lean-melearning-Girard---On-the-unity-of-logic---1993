@@ -4,15 +4,18 @@ This file compares `Girard - On the unity of logic - 1993.typ`, section by secti
 Lean development in `RequestProject/LU/`. The full project builds. It has exactly one
 `sorry`: `cut_elimination` in `MainTheorem.lean`.
 
-**Short answer: no.** The paper's technical core is formalized and faithful: the language,
-the polarity tables, the calculus LU, the fragments and the Theorem of §6 for cut-free
-proofs. It is not complete in three ways:
+**Short answer: almost.** The language, the polarity tables, the calculus LU, the
+fragments, the Theorem of §6 for cut-free proofs, the substitution property, the §4
+equivalence with linear logic, soundness for the Table 3 reading and the comparisons with
+LJ/LK are formalized and proved. What remains:
 
 1. The Theorem of §6 *with cuts* (`fragment_theorem`) depends on cut elimination for LU,
    which is not proved. The paper does not prove it either (Remark (i)).
-2. Several secondary claims of the paper are not formalized at all (list below).
-3. The typ file and the Lean code read one rule of Fig. 3 differently. This is the left
-   rule for `N ⇒ P`; see the last section.
+2. The denotational claims (Remark (ii), §1, §5, Conclusion) and the comparison with
+   Girard's LC are not formalized (list below).
+3. The left rule for `N ⇒ P` is the additive one, a deliberate departure from the
+   (misprinted) multiplicative rule of Fig. 3; see the last section. The typ file has been
+   patched to match.
 
 ## What is formalized and matches the typ file
 
@@ -31,19 +34,27 @@ proofs. It is not complete in three ways:
 | §6 head-variable remark | `neutral_headVariable` | **Proved** |
 | §6 Theorem, with cuts | `fragment_theorem` | Depends on unproved `cut_elimination` |
 | Remark (i): cut elimination | `cut_elimination` | **`sorry`** |
+| §6 substitution property | `Substitution.lean`: `Fragment.mem_substPred`, `Fragment.seq_substPred`, `Provable.substPred`, `CutFreeProvable.substPred`, `ProvableWithin.substPred` | **Proved** |
+| §4: LL translates into LU (`Γ ⊢ Δ` ↦ `Γ; ⊢ ;Δ`), cut-free to cut-free | `LinearLogic.lean`: `LL.provable`, `LL.cutFreeProvable` | **Proved** |
+| §4: strengthened `!` rule (`P ⊢ !P` for positive, `?N ⊢ N` for negative, neutral atoms) | `LinearEquiv.lean`: `Formula.IsNeutralLinear.bang_quest`, `LL.bangR_strong` | **Proved** |
+| §4: LU with neutral atoms translates into LL | `LinearEquiv.lean`: `LL.of_derivable_neutralLinear`, `LL.of_cutFreeProvable_neutralLinear` | **Proved** |
+| §4: equivalence (neutral linear `Γ; ⊢ ;Δ` provable in LU iff `Γ ⊢ Δ` in LL) | `Table3Soundness.lean`: `provable_iff_LL` | **Proved** (no cut-elimination hypothesis) |
+| Soundness of all LU rules (with cuts) for the Table 3 reading `Γ*, !Γ'* ⊢ ?Δ'*, Δ*` | `Table3Soundness.lean`: `LL.of_provable_table3`, `LL.of_provable_toLinear` | **Proved** |
+| End of §6: intuitionistic fragments vs LJ | `LJ.lean`: `LJ.of_provableWithin_intuitionistic`, `LJ.of_provableWithin_neutralInt`, `LJ.provable` | **Proved** (LU-with-cuts → LJ uses a cut-elimination hypothesis) |
+| End of §6: classical fragment vs LK | `LK.lean`: `LK.of_cutFreeProvable_classical`, `LK.of_provableWithin_classical` | **Proved** (LK, not LC) |
 
 ## Not formalized
 
-* **§4:** the claim that LU (with neutral atoms) is equivalent to ordinary linear logic,
-  in both directions. That includes the strengthened `!` rule for positive/negative contexts.
-* **Soundness of LU with respect to Table 3:** only the polarity agreement is proved.
-  There is no theorem that LU rules are derivable in linear logic via `toLinear`.
-* **§6, the substitution property:** fragments are closed under substituting formulas of the
-  same polarity for atoms.
+* **Cut elimination** (Remark (i)): not proved. `cutFreeProvable_of_LLCutElimination` shows
+  that, for linear sequents `Γ; ⊢ ;Δ` with neutral atoms, it would follow from cut
+  elimination for linear logic (taken as a hypothesis).
 * **Remark (ii):** the denotational content (coherent and correlation spaces, proofs being
   denotationally equal). This needs a semantics that is not formalized.
-* **End of §6:** the comparison of the fragments with LJ (`Γ;Γ' ⊢ ;A` ↦ `Γ,Γ' ⊢ A`) and
-  with LC.
+* **End of §6, LC:** Girard's calculus LC is not formalized; the classical fragment is
+  compared with Gentzen's LK instead (soundness direction only).
+* **Table 3 with positive/negative atoms:** the Table 3 reading treats a positive atom `p`
+  as `!p₀` and a negative atom as `?p₀` (`Formula.toLL`); for neutral atoms it is exactly
+  `toLinear`.
 * **§1, §5 and the Conclusion:** the informal claims about isomorphisms and associativity
   of disjunction (these are denotational).
 
@@ -51,8 +62,9 @@ proofs. It is not complete in three ways:
 
 * The scanned PDF prints
   `Γ;Γ' ⊢ Δ';Δ,N   Q,Λ;Γ' ⊢ Δ';Π  /  N⇒P,Γ,Λ;Γ' ⊢ Δ';Δ;Π`, which contains misprints.
-* The typ file corrects this to the **multiplicative** rule
-  `Γ;Γ' ⊢ Δ';Δ,N   P,Λ;Γ' ⊢ Δ';Π  /  N⇒P,Γ,Λ;Γ' ⊢ Δ';Δ,Π`.
+* The typ file originally corrected this to the **multiplicative** rule
+  `Γ;Γ' ⊢ Δ';Δ,N   P,Λ;Γ' ⊢ Δ';Π  /  N⇒P,Γ,Λ;Γ' ⊢ Δ';Δ,Π`; it has since been patched
+  to the additive rule below, so the typ file and the Lean code now agree.
 * The Lean code (`Rule.impL_NP`) uses the **additive** rule
   `Γ;Γ' ⊢ Δ';Δ,N   P,Γ;Γ' ⊢ Δ';Δ  /  N⇒P,Γ;Γ' ⊢ Δ';Δ`.
   This is the left rule of `N⊥ ⊕ P`, which is what Table 3 gives for `N ⇒ P`. It also

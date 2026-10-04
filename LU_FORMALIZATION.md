@@ -14,11 +14,20 @@ All files are under `RequestProject/LU/`.
 | Theorem §6: classical fragment | `Classical.lean`, `ClMain.lean` (`classical_within`) |
 | Theorem §6 (all fragments) | `MainTheorem.lean` |
 | Left rule for `N ⇒ P`: the multiplicative reading breaks the classical invariant | `MultiplicativeReading.lean` |
+| §6: the substitution property | `Substitution.lean` (`Formula.substPred`, `Fragment.mem_substPred`, `Fragment.seq_substPred`, `CutFreeProvable.substPred`, `Provable.substPred`, `ProvableWithin.substPred`) |
+| End of §6: comparison of the intuitionistic fragments with LJ | `LJ.lean` (`LJ`, `LJ.of_provableWithin_intuitionistic`, `LJ.of_provableWithin_neutralInt`, `LJ.provable`) |
+| End of §6: the classical fragment and LK | `LK.lean` (`LK`, `LK.of_cutFreeProvable_classical`, `LK.of_provableWithin_classical`) |
+| §4: usual linear logic and its translation into LU | `LinearLogic.lean` (`LL`, `LL.provable`, `LL.cutFreeProvable`) |
+| §4: the strengthened `!` rule and the translation of LU (neutral atoms) into LL | `LinearEquiv.lean` (`Formula.IsNeutralLinear.bang_quest`, `LL.bangR_strong`, `LL.of_derivable_neutralLinear`, `LL.of_cutFreeProvable_neutralLinear`) |
+| §5: soundness of every LU rule for the Table 3 reading; §4 equivalence | `Table3Soundness.lean` (`Formula.toLL`, `LL.of_provable_table3`, `LL.of_provable_toLinear`, `provable_iff_LL`, `cutFreeProvable_of_LLCutElimination`) |
 
 Status:
 * `fragment_theorem_cutFree` (the theorem for cut-free proofs, all four fragments) is fully
   proved, as is `fragment_theorem_of_cutElimination` (the theorem for proofs with cuts,
   assuming cut elimination).
+* §4 (equivalence of LU with neutral atoms and linear logic, both directions, including the
+  strengthened `!` rule), soundness of LU for the Table 3 reading, the substitution property
+  and the comparisons with LJ and LK are fully proved.
 * `cut_elimination` (Remark (i): "more or less obvious (but perhaps a bit too long to write
   down explicitly)") is **not** proved; it is the only `sorry` in the development, and
   `fragment_theorem` (the statement with cuts) depends on it.

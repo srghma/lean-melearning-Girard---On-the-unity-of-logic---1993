@@ -1,3 +1,30 @@
+# Summary of changes for run e0698a9a-a9f4-424b-b383-cb72c12d6c24
+I fixed every open item except cut elimination for LU. That is still the project's only `sorry` (`cut_elimination` in `MainTheorem.lean`), and the paper only claims it too (Remark (i)). The whole project builds, and every new theorem uses only the standard axioms (`propext`, `Classical.choice`, `Quot.sound`).
+
+**1. Left rule for `N ⇒ P`.** `Rule.impL_NP` keeps the additive rule. Its docstring and the file header of `Calculus.lean` now say that this deliberately departs from the misprinted multiplicative rule in Fig. 3. Your patch to the typ file is applied, so the typ file and the Lean code agree.
+
+**2. Substitution property (§6)**, in `Substitution.lean`:
+- The four fragments are closed under substituting a formula for an atom (`Fragment.mem_substPred`).
+- If the formula has the atom's polarity, polarity is preserved and sequents of a fragment stay in that fragment.
+- Provability is preserved with cuts, without cuts, and within a fragment (`Provable.substPred`, `CutFreeProvable.substPred`, `ProvableWithin.substPred`).
+
+**3. §4, LU is equivalent to linear logic.**
+- `LinearLogic.lean` defines two-sided first-order linear logic `LL` and translates its proofs into LU, so that \(\Gamma \vdash \Delta\) becomes `Γ; ⊢ ;Δ`. Cut-free proofs map to cut-free proofs, and promotion is simulated through the central zone as the paper describes (`LL.provable`, `LL.cutFreeProvable`).
+- `LinearEquiv.lean` proves the paper's "easy inductive argument": with neutral atoms, \(P \vdash\, !P\) for positive \(P\) and \(?N \vdash N\) for negative \(N\). From this it derives the strengthened `!` rule (`LL.bangR_strong`). It also translates any LU derivation of `Γ;Γ' ⊢ Δ';Δ` made of linear formulas with neutral atoms into an LL proof of \(\Gamma, !\Gamma' \vdash ?\Delta', \Delta\) (`LL.of_derivable_neutralLinear`). One difference: the paper leaves positive central formulas without `!`, while I put `!` on all of them; the lemma above makes the two readings equivalent.
+- `provable_iff_LL`: for linear formulas with neutral atoms, `Γ; ⊢ ;Δ` is provable in LU (cuts allowed) if and only if \(\Gamma \vdash \Delta\) is provable in LL. This needs no cut-elimination hypothesis.
+
+**4. Soundness for Table 3**, in `Table3Soundness.lean`. `LL.of_provable_table3` shows that every LU rule, including the cuts and all Fig. 3 cases, is sound for the reading \(\Gamma^*, !\Gamma'^* \vdash ?\Delta'^*, \Delta^*\), where \(A^*\) is the Table 3 decomposition. The theorem covers all atom polarities: a positive atom \(p\) is read as \(!p_0\) and a negative one as \(?p_0\), where \(p_0\) is the neutral atom with the same name and arity. With only neutral atoms, the reading is exactly `toLinear` (`LL.of_provable_toLinear`). This also confirms that the additive `N ⇒ P` rule is sound for \(N^\perp \oplus P\).
+
+**5. Comparison with LJ and LK** (end of §6):
+- `LJ.lean`: provability within the intuitionistic fragments translates to Gentzen's LJ, and LJ proofs of intuitionistic sequents are LU-provable, using cuts.
+- `LK.lean`: cut-free classical LU proofs translate to LK. The paper's LC is not formalized, so this is LK rather than LC.
+
+**Still open:**
+- **Cut elimination for LU** is not proved, so `fragment_theorem` (the §6 theorem with cuts) remains in progress. The cut-free version and the version that assumes cut elimination are proved. For linear sequents `Γ; ⊢ ;Δ` with neutral atoms, `cutFreeProvable_of_LLCutElimination` shows that LU cut elimination would follow from cut elimination for linear logic, which is also not proved; it is a hypothesis of that theorem.
+- **Remark (ii)** and the other denotational claims (coherence and correlation spaces) are outside this formalization.
+
+`COMPLETENESS_AUDIT.md`, `LU_FORMALIZATION.md` and the Properties table are updated to match.
+
 # Summary of changes for run 64c3f34e-dc42-4e7f-b817-09bfc683878a
 **No, the formalization is not complete.** I compared your typ file with the Lean code section by section. The core of the paper is formalized and matches it, but three things are missing or differ. The project builds, and it has exactly one `sorry`. The full comparison is in `COMPLETENESS_AUDIT.md`.
 
