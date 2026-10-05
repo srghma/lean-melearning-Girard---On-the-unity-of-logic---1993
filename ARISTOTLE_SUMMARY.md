@@ -1,3 +1,31 @@
+# Summary of changes for run 73e141c1-5d94-47a5-89ce-1b1c7aab605b
+**Short answer: yes. Whatever polarity you give the predicate symbols, LU cannot derive falsity.** This is now proved in Lean, in the new file `RequestProject/LU/Consistency.lean`. It builds with no `sorry`, uses only the standard axioms (`propext`, `Classical.choice`, `Quot.sound`), and does not depend on the unproved `cut_elimination`.
+
+**Cut elimination is still open.** It was the only remaining `sorry`, and it is still unproved. Of the earlier results, only `fragment_theorem` (the §6 theorem for proofs with cuts) depends on it. Girard also only claims it ("more or less obvious, but perhaps a bit too long to write down"). I did not attempt it in this session, because a proof for this calculus is very long. The calculus has about 90 rules, and a positive formula on the right can meet a copy of itself in the left middle (classical) zone while the surrounding linear formulas cannot be copied. Handling that needs, for each positive connective and mirrored for each negative one, a separate result about splitting formulas in the middle zones. On top of that come cut-permutation steps against every rule and a substitution lemma for proofs. This is a separate, much larger project.
+
+**How the polarity result is proved**
+- **Polarity-free meaning:** formulas get an ordinary true/false reading in any structure (any domain, including an empty one), ignoring polarity and linearity:
+  - ⊗, &, ∧ mean "and"; ⅋, ⊕, ∨ mean "or";
+  - ⊸, ⇒, ⊃ mean "implies"; ¬ means "not";
+  - !A and ?A both mean A; 1 and ⊤ are true, 0 and ⊥ are false;
+  - ⋀ and ∀ mean "for all"; ⋁ and ∃ mean "there exists".
+- **Valid sequents:** \(\Gamma ; \Gamma' \vdash \Delta' ; \Delta\) is valid if, for every value of the variables, everything in \(\Gamma, \Gamma'\) being true makes something in \(\Delta', \Delta\) true.
+- **Every rule is sound:** `Rule.sound` checks every rule of Figures 1–3, and `CutRule.sound` checks the three cut rules. None of these proofs uses a polarity side condition. This is the key point: the polarity of an atom only decides which rules may be applied, and every rule is sound regardless.
+- **Every provable sequent is valid** (`Provable.valid`), in every structure, with cuts allowed.
+
+**What follows from it**
+
+Each of these holds for every signature, so for every choice of `predPol`:
+- `not_provable_empty`: the empty sequent `; ⊢ ;` is not provable.
+- `not_provable_zero` and `not_provable_bot`: `; ⊢ ; 0` and `; ⊢ ; ⊥` are not provable.
+- `not_provable_atom`: no atom \(p(t_1,\dots,t_k)\) is provable, whatever polarity \(p\) has.
+- `not_provable_and_neg`: no formula is provable together with its negation.
+- `consistent_for_every_polarity` puts these together for fixed predicate symbols with an arbitrary polarity function `pol : Pred → Pol`.
+
+This complements the existing `LL.of_provable_table3`, which shows that any polarity assignment is also sound for the Table 3 reading in linear logic.
+
+The full project builds, `LU_FORMALIZATION.md` has the new entries, and the Properties table now lists the semantics, the soundness theorem and the consistency theorem (both proved). Everything is committed.
+
 # Summary of changes for run 8aa19667-53b5-4f9e-9dd5-f773b04dad50
 I implemented `SIGNATURE_ASSESSMENT.md` with the mutual `Tm`/`Tms` pair, and the whole development now works over any signature. After a clean rebuild the project compiles. The only `sorry` is still `cut_elimination`, which the paper also only claims. The main theorems use only the standard axioms (`propext`, `Classical.choice`, `Quot.sound`); `fragment_theorem` still depends on the `sorry`.
 

@@ -20,6 +20,7 @@ All files are under `RequestProject/LU/`.
 | §4: usual linear logic and its translation into LU | `LinearLogic.lean` (`LL`, `LL.provable`, `LL.cutFreeProvable`) |
 | §4: the strengthened `!` rule and the translation of LU (neutral atoms) into LL | `LinearEquiv.lean` (`Formula.IsNeutralLinear.bang_quest`, `Formula.IsGuardedLinear.bang_quest`, `LL.bangR_strong`, `LL.of_derivable_neutralLinear`, `LL.of_cutFreeProvable_neutralLinear`) |
 | §5: soundness of every LU rule for the Table 3 reading; §4 equivalence | `Table3Soundness.lean` (`Formula.toLL`, `LL.of_provable_table3`, `LL.of_provable_toLinear`, `provable_iff_LL`, `cutFreeProvable_of_LLCutElimination`) |
+| Consistency of LU for every choice of atom polarities (classical soundness) | `Consistency.lean` (`Model`, `Model.eval`, `Model.Valid`, `Rule.sound`, `CutRule.sound`, `Provable.valid`, `not_provable_empty`, `not_provable_zero`, `not_provable_bot`, `not_provable_atom`, `not_provable_and_neg`, `consistent_for_every_polarity`) |
 
 Status:
 * `fragment_theorem_cutFree` (the theorem for cut-free proofs, all four fragments) is fully
@@ -28,6 +29,11 @@ Status:
 * §4 (equivalence of LU with neutral atoms and linear logic, both directions, including the
   strengthened `!` rule), soundness of LU for the Table 3 reading, the substitution property
   and the comparisons with LJ and LK are fully proved.
+* Consistency, for an arbitrary polarity assignment to the predicate symbols: every rule of
+  LU (including the three cuts) is sound for the classical reading that forgets polarities and
+  linearity, so provable sequents are classically valid, the empty sequent, `; ⊢ ; 0` and
+  `; ⊢ ; ⊥` are unprovable, and no formula is provable together with its negation. This is
+  fully proved and does not depend on `cut_elimination`.
 * `cut_elimination` (Remark (i): "more or less obvious (but perhaps a bit too long to write
   down explicitly)") is **not** proved; it is the only `sorry` in the development, and
   `fragment_theorem` (the statement with cuts) depends on it.
