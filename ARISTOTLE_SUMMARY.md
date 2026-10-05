@@ -1,3 +1,46 @@
+# Summary of changes for run 14b89ece-1774-462c-adc8-4eaed4ef30bd
+**Short answer to your polarity question:** in full LU no zone can be limited to a fixed polarity. Such limits only hold inside the four fragments of §6, and I've now built those limits into the types there.
+- In full LU, the identity rule `A ; ⊢ ; A` puts any formula into both linear zones, and `inL`/`inR` let any formula into the middle zones. The only polarity conditions (`outL` for positive, `outR` for negative) restrict which formulas may leave a zone; they don't say what a zone contains.
+- LU also needs atoms of all three polarities in one signature, so `PredSig` has to keep a free `predPol`.
+
+All new code builds with no `sorry` and uses only the standard axioms. It is in three new files; `Syntax.lean`, `Calculus.lean` and the rest of the development are unchanged.
+
+**Atoms of a fixed polarity** (`RequestProject/LU/FragmentSyntax.lean`)
+- `PS.PredOf q` is the type of predicate symbols of polarity `q`.
+- `PS.restrict ok` is the sub-signature of symbols whose polarity satisfies `ok`.
+- `PolPredSig` gives a signature by polarity (`Pred : Pol → Type`); setting `Pred .neu := Empty` gives a signature with no neutral predicates.
+
+**Polarity built into each fragment's formula type.** Each constructor computes the polarity from Tables 1–2, and atoms can only come from the allowed polarities, so for example a neutral atom cannot be written in a classical formula:
+- `ClFormula PS TS n c`: classical formulas, with `c` either positive or negative (classical formulas are never neutral).
+- `IntFormula`: intuitionistic formulas, positive or neutral (never negative).
+- `NFormula`: neutral intuitionistic formulas, always neutral.
+- `LinFormula PS TS n q`: linear formulas, any polarity. This is a working model of what a polarity-indexed `Formula` for all of LU would look like.
+
+For each of these I proved:
+- `pol_toFormula`: the LU polarity of the embedded formula equals the type's polarity index.
+- `*_iff`: the embedding produces exactly the formulas accepted by `IsClassical`, `IsIntuitionistic`, `IsNeutralInt` and `IsLinear`.
+- Injectivity of the classical and neutral embeddings, and substitution that by its type preserves polarity (classical and linear).
+
+**Zone limits by construction — the kind of rule you suggested**
+- **`ClSequent`:** the left linear zone holds only positive formulas and the right linear zone only negative ones. A separate `Stoup` slot (`empty | left N | right P`) holds the one formula allowed to break this, so the condition `μ ≤ 1` holds by construction.
+- **`IntSequent`:** the shape `Γ;Γ' ⊢ ;A`, with no right middle zone and a single formula on the right.
+- **`NIntSequent`:** the left linear zone is an `Option`, so it holds at most one formula.
+- **`LinSequent`:** all four zones hold linear formulas.
+
+Two results tie these types back to the existing development:
+- **`range_toSequent`** (four versions, in `FragmentSyntax.lean` and `FragmentSyntaxInt.lean`): for example, `ClassicalSeq S ↔ ∃ T : ClSequent PS TS n, T.toSequent = S`. The new sequent types give exactly the fragment sequents defined in `Fragments.lean`, no more and no less.
+- **`*.cutFree_within`** (`FragmentSyntaxTheorem.lean`): the §6 theorem restated with the new types. A cut-free proof of a fragment sequent can be replaced by one in which every sequent comes from that fragment's new sequent type. This does not depend on the unproved `cut_elimination`.
+
+**What else could be done:** `CORRECT_BY_CONSTRUCTION.md` explains the above and lists further options, none of which I implemented, with their costs:
+- a polarity-indexed `Formula` for all of LU, so rule side conditions like `hP : P.pol = .pos` become argument types (expensive: every file changes);
+- rules with a fixed number of premises (0, 1 or 2);
+- proofs as data rather than a `Prop`, which is the natural basis for cut elimination;
+- separate calculi for each fragment that work directly on the new sequent types;
+- a named shape for sequents with an empty linear context;
+- many-sorted terms (not needed for the paper).
+
+`LU_FORMALIZATION.md` has a new row pointing to these files.
+
 # Summary of changes for run 73e141c1-5d94-47a5-89ce-1b1c7aab605b
 **Short answer: yes. Whatever polarity you give the predicate symbols, LU cannot derive falsity.** This is now proved in Lean, in the new file `RequestProject/LU/Consistency.lean`. It builds with no `sorry`, uses only the standard axioms (`propext`, `Classical.choice`, `Quot.sound`), and does not depend on the unproved `cut_elimination`.
 

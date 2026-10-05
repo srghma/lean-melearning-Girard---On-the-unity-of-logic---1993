@@ -21,6 +21,7 @@ All files are under `RequestProject/LU/`.
 | §4: the strengthened `!` rule and the translation of LU (neutral atoms) into LL | `LinearEquiv.lean` (`Formula.IsNeutralLinear.bang_quest`, `Formula.IsGuardedLinear.bang_quest`, `LL.bangR_strong`, `LL.of_derivable_neutralLinear`, `LL.of_cutFreeProvable_neutralLinear`) |
 | §5: soundness of every LU rule for the Table 3 reading; §4 equivalence | `Table3Soundness.lean` (`Formula.toLL`, `LL.of_provable_table3`, `LL.of_provable_toLinear`, `provable_iff_LL`, `cutFreeProvable_of_LLCutElimination`) |
 | Consistency of LU for every choice of atom polarities (classical soundness) | `Consistency.lean` (`Model`, `Model.eval`, `Model.Valid`, `Rule.sound`, `CutRule.sound`, `Provable.valid`, `not_provable_empty`, `not_provable_zero`, `not_provable_bot`, `not_provable_atom`, `not_provable_and_neg`, `consistent_for_every_polarity`) |
+| §6 fragments *by construction*: polarity-sliced signatures, polarity-indexed fragment formulas, stoup sequents | `FragmentSyntax.lean` (`PredSig.PredOf`, `PredSig.restrict`, `PolPredSig`, `CPol`, `ClFormula`, `Stoup`, `ClSequent`, `ClSequent.range_toSequent`), `FragmentSyntaxInt.lean` (`IntFormula`, `IntSequent`, `NFormula`, `NIntSequent`, `LinFormula`, `LinSequent`, `*.range_toSequent`), `FragmentSyntaxTheorem.lean` (`*.cutFree_within`); see `CORRECT_BY_CONSTRUCTION.md` |
 
 Status:
 * `fragment_theorem_cutFree` (the theorem for cut-free proofs, all four fragments) is fully
