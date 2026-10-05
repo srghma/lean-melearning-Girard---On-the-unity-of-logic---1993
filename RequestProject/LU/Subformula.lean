@@ -17,102 +17,110 @@ are closed classes.
 
 namespace LU
 
+variable {PS : PredSig} {TS : TermSig} [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
 variable {n : ℕ}
 
 open Formula
 
 /-- A class of formulas closed under immediate subformulas, shift and instantiation. -/
-structure SubClosed (F : ∀ {n : ℕ}, Formula n → Prop) : Prop where
-  neg : ∀ {n : ℕ} (A : Formula n), F (neg A) → F A
-  bang : ∀ {n : ℕ} (A : Formula n), F (bang A) → F A
-  quest : ∀ {n : ℕ} (A : Formula n), F (quest A) → F A
-  tensor : ∀ {n : ℕ} (A B : Formula n), F (tensor A B) → F A ∧ F B
-  par : ∀ {n : ℕ} (A B : Formula n), F (par A B) → F A ∧ F B
-  lolli : ∀ {n : ℕ} (A B : Formula n), F (lolli A B) → F A ∧ F B
-  with_ : ∀ {n : ℕ} (A B : Formula n), F (with_ A B) → F A ∧ F B
-  plus : ∀ {n : ℕ} (A B : Formula n), F (plus A B) → F A ∧ F B
-  conj : ∀ {n : ℕ} (A B : Formula n), F (conj A B) → F A ∧ F B
-  disj : ∀ {n : ℕ} (A B : Formula n), F (disj A B) → F A ∧ F B
-  imp : ∀ {n : ℕ} (A B : Formula n), F (imp A B) → F A ∧ F B
-  iimp : ∀ {n : ℕ} (A B : Formula n), F (iimp A B) → F A ∧ F B
-  lall : ∀ {n : ℕ} (A : Formula (n + 1)), F (lall A) → F A
-  lex : ∀ {n : ℕ} (A : Formula (n + 1)), F (lex A) → F A
-  call : ∀ {n : ℕ} (A : Formula (n + 1)), F (call A) → F A
-  cex : ∀ {n : ℕ} (A : Formula (n + 1)), F (cex A) → F A
-  shift : ∀ {n : ℕ} (A : Formula n), F A → F A.shift
-  inst : ∀ {n : ℕ} (A : Formula (n + 1)) (t : Term n), F A → F (A.inst t)
+structure SubClosed (F : ∀ {n : ℕ}, Formula PS TS n → Prop) : Prop where
+  neg : ∀ {n : ℕ} (A : Formula PS TS n), F (neg A) → F A
+  bang : ∀ {n : ℕ} (A : Formula PS TS n), F (bang A) → F A
+  quest : ∀ {n : ℕ} (A : Formula PS TS n), F (quest A) → F A
+  tensor : ∀ {n : ℕ} (A B : Formula PS TS n), F (tensor A B) → F A ∧ F B
+  par : ∀ {n : ℕ} (A B : Formula PS TS n), F (par A B) → F A ∧ F B
+  lolli : ∀ {n : ℕ} (A B : Formula PS TS n), F (lolli A B) → F A ∧ F B
+  with_ : ∀ {n : ℕ} (A B : Formula PS TS n), F (with_ A B) → F A ∧ F B
+  plus : ∀ {n : ℕ} (A B : Formula PS TS n), F (plus A B) → F A ∧ F B
+  conj : ∀ {n : ℕ} (A B : Formula PS TS n), F (conj A B) → F A ∧ F B
+  disj : ∀ {n : ℕ} (A B : Formula PS TS n), F (disj A B) → F A ∧ F B
+  imp : ∀ {n : ℕ} (A B : Formula PS TS n), F (imp A B) → F A ∧ F B
+  iimp : ∀ {n : ℕ} (A B : Formula PS TS n), F (iimp A B) → F A ∧ F B
+  lall : ∀ {n : ℕ} (A : Formula PS TS (n + 1)), F (lall A) → F A
+  lex : ∀ {n : ℕ} (A : Formula PS TS (n + 1)), F (lex A) → F A
+  call : ∀ {n : ℕ} (A : Formula PS TS (n + 1)), F (call A) → F A
+  cex : ∀ {n : ℕ} (A : Formula PS TS (n + 1)), F (cex A) → F A
+  shift : ∀ {n : ℕ} (A : Formula PS TS n), F A → F A.shift
+  inst : ∀ {n : ℕ} (A : Formula PS TS (n + 1)) (t : Tm TS n), F A → F (A.inst t)
 
-theorem allIn_mk {F : ∀ {n : ℕ}, Formula n → Prop} {Γ Δ : Multiset (Formula n)}
-    {Γ' Δ' : Finset (Formula n)} :
+section
+
+omit [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
+theorem allIn_mk {F : ∀ {n : ℕ}, Formula PS TS n → Prop} {Γ Δ : Multiset (Formula PS TS n)}
+    {Γ' Δ' : Finset (Formula PS TS n)} :
     AllIn F ⟪Γ ; Γ' ⊢ Δ' ; Δ⟫ ↔
       (∀ A ∈ Γ, F A) ∧ (∀ A ∈ Γ', F A) ∧ (∀ A ∈ Δ', F A) ∧ (∀ A ∈ Δ, F A) := by
   simp [AllIn, Sequent.formulas, or_imp, forall_and, and_assoc]
 
-theorem forall_mem_sh {F : ∀ {n : ℕ}, Formula n → Prop} (hF : SubClosed F) {Γ : Multiset (Formula n)}
+theorem forall_mem_sh {F : ∀ {n : ℕ}, Formula PS TS n → Prop} (hF : SubClosed F) {Γ : Multiset (Formula PS TS n)}
     (h : ∀ A ∈ Γ, F A) : ∀ A ∈ sh Γ, F A := by
   intro A hA
   obtain ⟨B, hB, rfl⟩ := Multiset.mem_map.1 hA
   exact hF.shift B (h B hB)
 
-theorem forall_mem_shc {F : ∀ {n : ℕ}, Formula n → Prop} (hF : SubClosed F)
-    {Γ : Finset (Formula n)} (h : ∀ A ∈ Γ, F A) : ∀ A ∈ shc Γ, F A := by
+end
+
+theorem forall_mem_shc {F : ∀ {n : ℕ}, Formula PS TS n → Prop} (hF : SubClosed F)
+    {Γ : Finset (Formula PS TS n)} (h : ∀ A ∈ Γ, F A) : ∀ A ∈ shc Γ, F A := by
   intro A hA
   obtain ⟨B, hB, rfl⟩ := Finset.mem_image.1 hA
   exact hF.shift B (h B hB)
 
 set_option maxHeartbeats 4000000 in
 /-- **Subformula property** of the cut-free rules of LU. -/
-theorem Rule.allIn_premises {F : ∀ {n : ℕ}, Formula n → Prop} (hF : SubClosed F)
-    {ps : List (Premise n)} {c : Sequent n} (hr : Rule ps c) (hc : AllIn F c) :
+theorem Rule.allIn_premises {F : ∀ {n : ℕ}, Formula PS TS n → Prop} (hF : SubClosed F)
+    {ps : List (Premise PS TS n)} {c : Sequent PS TS n} (hr : Rule ps c) (hc : AllIn F c) :
     ∀ p ∈ ps, p.All (AllIn F) := by
-  have hsh : ∀ {n : ℕ} (Γ : Multiset (Formula n)), (∀ A ∈ Γ, F A) → ∀ A ∈ sh Γ, F A :=
+  have hsh : ∀ {n : ℕ} (Γ : Multiset (Formula PS TS n)), (∀ A ∈ Γ, F A) → ∀ A ∈ sh Γ, F A :=
     fun Γ h => forall_mem_sh hF h
-  have hshc : ∀ {n : ℕ} (Γ : Finset (Formula n)), (∀ A ∈ Γ, F A) → ∀ A ∈ shc Γ, F A :=
+  have hshc : ∀ {n : ℕ} (Γ : Finset (Formula PS TS n)), (∀ A ∈ Γ, F A) → ∀ A ∈ shc Γ, F A :=
     fun Γ h => forall_mem_shc hF h
-  have hneg : ∀ {n : ℕ} (A : Formula n), F (neg A) → F A := hF.neg
-  have hbang : ∀ {n : ℕ} (A : Formula n), F (bang A) → F A := hF.bang
-  have hquest : ∀ {n : ℕ} (A : Formula n), F (quest A) → F A := hF.quest
-  have htensor₁ : ∀ {n : ℕ} (A B : Formula n), F (tensor A B) → F A :=
+  have hneg : ∀ {n : ℕ} (A : Formula PS TS n), F (neg A) → F A := hF.neg
+  have hbang : ∀ {n : ℕ} (A : Formula PS TS n), F (bang A) → F A := hF.bang
+  have hquest : ∀ {n : ℕ} (A : Formula PS TS n), F (quest A) → F A := hF.quest
+  have htensor₁ : ∀ {n : ℕ} (A B : Formula PS TS n), F (tensor A B) → F A :=
     fun A B h => (hF.tensor A B h).1
-  have htensor₂ : ∀ {n : ℕ} (A B : Formula n), F (tensor A B) → F B :=
+  have htensor₂ : ∀ {n : ℕ} (A B : Formula PS TS n), F (tensor A B) → F B :=
     fun A B h => (hF.tensor A B h).2
-  have hpar₁ : ∀ {n : ℕ} (A B : Formula n), F (par A B) → F A :=
+  have hpar₁ : ∀ {n : ℕ} (A B : Formula PS TS n), F (par A B) → F A :=
     fun A B h => (hF.par A B h).1
-  have hpar₂ : ∀ {n : ℕ} (A B : Formula n), F (par A B) → F B :=
+  have hpar₂ : ∀ {n : ℕ} (A B : Formula PS TS n), F (par A B) → F B :=
     fun A B h => (hF.par A B h).2
-  have hlolli₁ : ∀ {n : ℕ} (A B : Formula n), F (lolli A B) → F A :=
+  have hlolli₁ : ∀ {n : ℕ} (A B : Formula PS TS n), F (lolli A B) → F A :=
     fun A B h => (hF.lolli A B h).1
-  have hlolli₂ : ∀ {n : ℕ} (A B : Formula n), F (lolli A B) → F B :=
+  have hlolli₂ : ∀ {n : ℕ} (A B : Formula PS TS n), F (lolli A B) → F B :=
     fun A B h => (hF.lolli A B h).2
-  have hwith₁ : ∀ {n : ℕ} (A B : Formula n), F (with_ A B) → F A :=
+  have hwith₁ : ∀ {n : ℕ} (A B : Formula PS TS n), F (with_ A B) → F A :=
     fun A B h => (hF.with_ A B h).1
-  have hwith₂ : ∀ {n : ℕ} (A B : Formula n), F (with_ A B) → F B :=
+  have hwith₂ : ∀ {n : ℕ} (A B : Formula PS TS n), F (with_ A B) → F B :=
     fun A B h => (hF.with_ A B h).2
-  have hplus₁ : ∀ {n : ℕ} (A B : Formula n), F (plus A B) → F A :=
+  have hplus₁ : ∀ {n : ℕ} (A B : Formula PS TS n), F (plus A B) → F A :=
     fun A B h => (hF.plus A B h).1
-  have hplus₂ : ∀ {n : ℕ} (A B : Formula n), F (plus A B) → F B :=
+  have hplus₂ : ∀ {n : ℕ} (A B : Formula PS TS n), F (plus A B) → F B :=
     fun A B h => (hF.plus A B h).2
-  have hconj₁ : ∀ {n : ℕ} (A B : Formula n), F (conj A B) → F A :=
+  have hconj₁ : ∀ {n : ℕ} (A B : Formula PS TS n), F (conj A B) → F A :=
     fun A B h => (hF.conj A B h).1
-  have hconj₂ : ∀ {n : ℕ} (A B : Formula n), F (conj A B) → F B :=
+  have hconj₂ : ∀ {n : ℕ} (A B : Formula PS TS n), F (conj A B) → F B :=
     fun A B h => (hF.conj A B h).2
-  have hdisj₁ : ∀ {n : ℕ} (A B : Formula n), F (disj A B) → F A :=
+  have hdisj₁ : ∀ {n : ℕ} (A B : Formula PS TS n), F (disj A B) → F A :=
     fun A B h => (hF.disj A B h).1
-  have hdisj₂ : ∀ {n : ℕ} (A B : Formula n), F (disj A B) → F B :=
+  have hdisj₂ : ∀ {n : ℕ} (A B : Formula PS TS n), F (disj A B) → F B :=
     fun A B h => (hF.disj A B h).2
-  have himp₁ : ∀ {n : ℕ} (A B : Formula n), F (imp A B) → F A :=
+  have himp₁ : ∀ {n : ℕ} (A B : Formula PS TS n), F (imp A B) → F A :=
     fun A B h => (hF.imp A B h).1
-  have himp₂ : ∀ {n : ℕ} (A B : Formula n), F (imp A B) → F B :=
+  have himp₂ : ∀ {n : ℕ} (A B : Formula PS TS n), F (imp A B) → F B :=
     fun A B h => (hF.imp A B h).2
-  have hiimp₁ : ∀ {n : ℕ} (A B : Formula n), F (iimp A B) → F A :=
+  have hiimp₁ : ∀ {n : ℕ} (A B : Formula PS TS n), F (iimp A B) → F A :=
     fun A B h => (hF.iimp A B h).1
-  have hiimp₂ : ∀ {n : ℕ} (A B : Formula n), F (iimp A B) → F B :=
+  have hiimp₂ : ∀ {n : ℕ} (A B : Formula PS TS n), F (iimp A B) → F B :=
     fun A B h => (hF.iimp A B h).2
-  have hlall : ∀ {n : ℕ} (A : Formula (n + 1)), F (lall A) → F A := hF.lall
-  have hlex : ∀ {n : ℕ} (A : Formula (n + 1)), F (lex A) → F A := hF.lex
-  have hcall : ∀ {n : ℕ} (A : Formula (n + 1)), F (call A) → F A := hF.call
-  have hcex : ∀ {n : ℕ} (A : Formula (n + 1)), F (cex A) → F A := hF.cex
-  have hinst : ∀ {n : ℕ} (A : Formula (n + 1)) (t : Term n), F A → F (A.inst t) := hF.inst
+  have hlall : ∀ {n : ℕ} (A : Formula PS TS (n + 1)), F (lall A) → F A := hF.lall
+  have hlex : ∀ {n : ℕ} (A : Formula PS TS (n + 1)), F (lex A) → F A := hF.lex
+  have hcall : ∀ {n : ℕ} (A : Formula PS TS (n + 1)), F (call A) → F A := hF.call
+  have hcex : ∀ {n : ℕ} (A : Formula PS TS (n + 1)), F (cex A) → F A := hF.cex
+  have hinst : ∀ {n : ℕ} (A : Formula PS TS (n + 1)) (t : Tm TS n), F A → F (A.inst t) := hF.inst
   cases hr <;>
     simp only [allIn_mk, Premise.all_same, Premise.all_up, List.mem_cons, List.not_mem_nil, Multiset.mem_cons,
       Multiset.mem_singleton, Multiset.mem_add, Multiset.notMem_zero, or_imp, forall_and,
@@ -159,8 +167,8 @@ theorem Rule.allIn_premises {F : ∀ {n : ℕ}, Formula n → Prop} (hF : SubClo
 
 /-- In a cut-free derivation whose conclusion has all its formulas in a closed class `F`,
 every sequent has all its formulas in `F`. -/
-theorem Derivable.allIn {F : ∀ {n : ℕ}, Formula n → Prop} (hF : SubClosed F)
-    {P : ∀ {n : ℕ}, Sequent n → Prop} {S : Sequent n} (h : Derivable Rule P S) (hS : AllIn F S) :
+theorem Derivable.allIn {F : ∀ {n : ℕ}, Formula PS TS n → Prop} (hF : SubClosed F)
+    {P : ∀ {n : ℕ}, Sequent PS TS n → Prop} {S : Sequent PS TS n} (h : Derivable Rule P S) (hS : AllIn F S) :
     Derivable Rule (fun S => P S ∧ AllIn F S) S := by
   induction h with
   | mk ps c hr hc _ _ ihs ihu =>
@@ -169,25 +177,43 @@ theorem Derivable.allIn {F : ∀ {n : ℕ}, Formula n → Prop} (hF : SubClosed 
 
 namespace Formula
 
-@[simp] theorem isClassical_subst {m : ℕ} (A : Formula n) (σ : Subst n m) :
+section
+
+omit [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
+@[simp] theorem isClassical_subst {m : ℕ} (A : Formula PS TS n) (σ : Subst TS n m) :
     (A.subst σ).IsClassical ↔ A.IsClassical := by
-  induction A generalizing m <;> simp_all [subst, IsClassical]
+  induction A generalizing m with
+  | atom p ts => exact Iff.rfl
+  | _ => first | exact Iff.rfl | simp_all [subst, IsClassical]
 
-@[simp] theorem isIntuitionistic_subst {m : ℕ} (A : Formula n) (σ : Subst n m) :
+@[simp] theorem isIntuitionistic_subst {m : ℕ} (A : Formula PS TS n) (σ : Subst TS n m) :
     (A.subst σ).IsIntuitionistic ↔ A.IsIntuitionistic := by
-  induction A generalizing m <;> simp_all [subst, IsIntuitionistic]
+  induction A generalizing m with
+  | atom p ts => exact Iff.rfl
+  | _ => first | exact Iff.rfl | simp_all [subst, IsIntuitionistic]
 
-@[simp] theorem isNeutralInt_subst {m : ℕ} (A : Formula n) (σ : Subst n m) :
+@[simp] theorem isNeutralInt_subst {m : ℕ} (A : Formula PS TS n) (σ : Subst TS n m) :
     (A.subst σ).IsNeutralInt ↔ A.IsNeutralInt := by
-  induction A generalizing m <;> simp_all [subst, IsNeutralInt]
+  induction A generalizing m with
+  | atom p ts => exact Iff.rfl
+  | _ => first | exact Iff.rfl | simp_all [subst, IsNeutralInt]
 
-@[simp] theorem isLinear_subst {m : ℕ} (A : Formula n) (σ : Subst n m) :
+@[simp] theorem isLinear_subst {m : ℕ} (A : Formula PS TS n) (σ : Subst TS n m) :
     (A.subst σ).IsLinear ↔ A.IsLinear := by
-  induction A generalizing m <;> simp_all [subst, IsLinear]
+  induction A generalizing m with
+  | atom p ts => exact Iff.rfl
+  | _ => first | exact Iff.rfl | simp_all [subst, IsLinear]
+
+end
 
 end Formula
 
-theorem subClosed_classical : SubClosed IsClassical where
+section
+
+omit [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
+theorem subClosed_classical : SubClosed (PS := PS) (TS := TS) IsClassical where
   neg _ h := h
   bang _ h := h.elim
   quest _ h := h.elim
@@ -207,7 +233,7 @@ theorem subClosed_classical : SubClosed IsClassical where
   shift A h := by simpa [shift] using h
   inst A t h := by simpa [inst] using h
 
-theorem subClosed_intuitionistic : SubClosed IsIntuitionistic where
+theorem subClosed_intuitionistic : SubClosed (PS := PS) (TS := TS) IsIntuitionistic where
   neg _ h := h.elim
   bang _ h := h.elim
   quest _ h := h.elim
@@ -227,7 +253,7 @@ theorem subClosed_intuitionistic : SubClosed IsIntuitionistic where
   shift A h := by simpa [shift] using h
   inst A t h := by simpa [inst] using h
 
-theorem subClosed_neutralInt : SubClosed IsNeutralInt where
+theorem subClosed_neutralInt : SubClosed (PS := PS) (TS := TS) IsNeutralInt where
   neg _ h := h.elim
   bang _ h := h.elim
   quest _ h := h.elim
@@ -247,7 +273,7 @@ theorem subClosed_neutralInt : SubClosed IsNeutralInt where
   shift A h := by simpa [shift] using h
   inst A t h := by simpa [inst] using h
 
-theorem subClosed_linear : SubClosed IsLinear where
+theorem subClosed_linear : SubClosed (PS := PS) (TS := TS) IsLinear where
   neg _ h := h
   bang _ h := h
   quest _ h := h
@@ -266,5 +292,7 @@ theorem subClosed_linear : SubClosed IsLinear where
   cex _ h := h.elim
   shift A h := by simpa [shift] using h
   inst A t h := by simpa [inst] using h
+
+end
 
 end LU

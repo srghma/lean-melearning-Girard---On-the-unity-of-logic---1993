@@ -19,12 +19,14 @@ Table 1 (`pol_toLinear`); and the decomposition is a formula of linear logic
 
 namespace LU
 
+variable {PS : PredSig} {TS : TermSig}
+
 variable {n : ℕ}
 
 namespace Formula
 
 /-- Table 3, conjunction `A ∧ B` (here `a`, `b` are the polarities of `A`, `B`). -/
-def conjLin {n : ℕ} : Pol → Pol → Formula n → Formula n → Formula n
+def conjLin {n : ℕ} : Pol → Pol → Formula PS TS n → Formula PS TS n → Formula PS TS n
   | .pos, .pos, A, B => tensor A B
   | .neu, .pos, A, B => tensor (bang A) B
   | .neg, .pos, A, B => tensor (bang A) B
@@ -36,7 +38,7 @@ def conjLin {n : ℕ} : Pol → Pol → Formula n → Formula n → Formula n
   | .neg, .neg, A, B => with_ A B
 
 /-- Table 3, disjunction `A ∨ B`. -/
-def disjLin {n : ℕ} : Pol → Pol → Formula n → Formula n → Formula n
+def disjLin {n : ℕ} : Pol → Pol → Formula PS TS n → Formula PS TS n → Formula PS TS n
   | .pos, .pos, A, B => plus A B
   | .neu, .pos, A, B => plus (bang A) B
   | .neg, .pos, A, B => par A (quest B)
@@ -48,7 +50,7 @@ def disjLin {n : ℕ} : Pol → Pol → Formula n → Formula n → Formula n
   | .neg, .neg, A, B => par A B
 
 /-- Table 3, classical implication `A ⇒ B`. -/
-def impLin {n : ℕ} : Pol → Pol → Formula n → Formula n → Formula n
+def impLin {n : ℕ} : Pol → Pol → Formula PS TS n → Formula PS TS n → Formula PS TS n
   | .pos, .pos, A, B => lolli A (quest B)
   | .neu, .pos, A, B => plus (bang (neg A)) B
   | .neg, .pos, A, B => plus (neg A) B
@@ -60,23 +62,23 @@ def impLin {n : ℕ} : Pol → Pol → Formula n → Formula n → Formula n
   | .neg, .neg, A, B => lolli (bang A) B
 
 /-- Table 3, intuitionistic implication `A ⊃ B`. -/
-def iimpLin {n : ℕ} : Pol → Formula n → Formula n → Formula n
+def iimpLin {n : ℕ} : Pol → Formula PS TS n → Formula PS TS n → Formula PS TS n
   | .pos, A, B => lolli A B
   | _, A, B => lolli (bang A) B
 
 /-- Table 3, `∀x A`. -/
-def callLin {n : ℕ} : Pol → Formula (n + 1) → Formula n
+def callLin {n : ℕ} : Pol → Formula PS TS (n + 1) → Formula PS TS n
   | .neg, A => lall A
   | _, A => lall (quest A)
 
 /-- Table 3, `∃x A`. -/
-def cexLin {n : ℕ} : Pol → Formula (n + 1) → Formula n
+def cexLin {n : ℕ} : Pol → Formula PS TS (n + 1) → Formula PS TS n
   | .pos, A => lex A
   | _, A => lex (bang A)
 
 /-- The translation of LU formulas into linear logic given by Table 3
 (chimeric connectives are unfolded according to the polarities of their arguments). -/
-def toLinear {n : ℕ} : Formula n → Formula n
+def toLinear {n : ℕ} : Formula PS TS n → Formula PS TS n
   | atom p ts => atom p ts
   | one => one
   | zero => zero
@@ -100,7 +102,7 @@ def toLinear {n : ℕ} : Formula n → Formula n
   | cex A => cexLin A.pol A.toLinear
 
 /-- Formulas built only from atoms, constants and the connectives of linear logic. -/
-def IsLinearConn {n : ℕ} : Formula n → Prop
+def IsLinearConn {n : ℕ} : Formula PS TS n → Prop
   | atom _ _ => True
   | one => True
   | zero => True
@@ -125,7 +127,7 @@ def IsLinearConn {n : ℕ} : Formula n → Prop
 
 /-- **Coherence of Tables 1, 2 and 3.** The polarity of every formula (Tables 1 and 2)
 equals the polarity of its linear decomposition (Table 3). -/
-theorem pol_toLinear (A : Formula n) : A.toLinear.pol = A.pol := by
+theorem pol_toLinear (A : Formula PS TS n) : A.toLinear.pol = A.pol := by
   induction A with
   | conj A B ihA ihB =>
     simp only [toLinear, pol]
@@ -151,7 +153,7 @@ theorem pol_toLinear (A : Formula n) : A.toLinear.pol = A.pol := by
   | _ => simp_all [toLinear, pol]
 
 /-- The decomposition of Table 3 only uses the connectives of linear logic. -/
-theorem isLinearConn_toLinear (A : Formula n) : A.toLinear.IsLinearConn := by
+theorem isLinearConn_toLinear (A : Formula PS TS n) : A.toLinear.IsLinearConn := by
   induction A with
   | conj A B ihA ihB =>
     simp only [toLinear]

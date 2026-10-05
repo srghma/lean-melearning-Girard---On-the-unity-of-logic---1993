@@ -1,3 +1,27 @@
+# Summary of changes for run 8aa19667-53b5-4f9e-9dd5-f773b04dad50
+I implemented `SIGNATURE_ASSESSMENT.md` with the mutual `Tm`/`Tms` pair, and the whole development now works over any signature. After a clean rebuild the project compiles. The only `sorry` is still `cut_elimination`, which the paper also only claims. The main theorems use only the standard axioms (`propext`, `Classical.choice`, `Quot.sound`); `fragment_theorem` still depends on the `sorry`.
+
+**New syntax (`RequestProject/LU/Syntax.lean`)**
+- **Signatures:** `TermSig` has fields `Func` and `arity`. `PredSig` has fields `Pred`, `arity` and `predPol`, so an atom's polarity is `PS.predPol p`.
+- **Terms and tuples:** the mutual pair is `Tm TS n` (terms: `var`, `func f (ts : Tms TS n (TS.arity f))`) and `Tms TS n k` (`k`-tuples: `nil`, `cons`). Since a tuple is never a term, atoms `atom p (ts : Tms TS n (PS.arity p))` have one representation each.
+- **Term operations:** renaming, substitution, the component accessor `Tms.get` and all composition lemmas are defined and proved by mutual structural recursion. Decidable equality of terms needs `[DecidableEq TS.Func]`.
+- **Formulas:** `Formula PS TS n` has decidable equality (`Formula.decEq`) given `[DecidableEq PS.Pred]` and `[DecidableEq TS.Func]`. One limitation: this equality cannot be evaluated by `decide`, so concrete formula comparisons have to be proved another way.
+- **No default term:** there is no fixed default term any more. `Formula.shift_injective` is now proved from injectivity of renaming, so a signature without constants is fine.
+
+**Rest of the development**
+- Every file takes `{PS : PredSig} {TS : TermSig} [DecidableEq PS.Pred] [DecidableEq TS.Func]` as section variables. `Sequent PS TS n` and `Premise PS TS n` are indexed by the signatures.
+- `CutElimination PS TS` and `LLCutElimination PS TS` take the signatures explicitly.
+- Theorems that don't need decidable equality leave those instance arguments out (via `omit`), so they don't carry unused assumptions.
+- **Substitution for an atom (`Substitution.lean`):** now stated for `a : PS.Pred`, with `A : Formula PS TS (n + PS.arity a)`.
+- **The example in `MultiplicativeReading.lean`:** now uses a concrete signature, `multPS` (two nullary positive predicates) and `multTS` (no function symbols).
+- **Table 3 soundness (`Table3Soundness.lean`):** the old code built "`p` declared neutral" as a new symbol, which an arbitrary signature doesn't provide. Instead, a positive atom `p` is now read as `!p` and a negative one as `?p`. This is sound because the linear logic rules never look at atom polarities. To support it, `LinearEquiv.lean` gains `Formula.IsGuardedLinear`: linear formulas whose atoms are neutral except under `!`/`?`. The paper's "easy inductive argument" is now proved for this wider class (`IsGuardedLinear.bang_quest`), and the old `IsNeutralLinear.bang_quest` follows from it. As a result, `LL.of_provable_table3`, `provable_iff_LL` and `cutFreeProvable_of_LLCutElimination` need no extra condition on the signature.
+
+**Unchanged:** the statements about rules, fragments, the §6 theorem, LJ, LK and the §4 equivalence are the same, apart from the added signature parameters.
+
+**Documentation:** `LU_FORMALIZATION.md` is updated, and `SIGNATURE_ASSESSMENT.md` has a "Status: implemented" note at the top. `RequestProject/SignatureAssessment.lean` is kept unchanged as the record of the assessment.
+
+**Properties table:** I updated the rows I could reach: the term, formula, sequent and polarity definitions, plus `fragment_theorem_cutFree`, `fragment_theorem`, `cut_elimination`, `provable_iff_LL`, `LL.of_provable_table3` and `neutral_headVariable`. Other older rows (for example the substitution, LJ/LK and multiplicative-reading results) could not all be reached in this session. Their statement snippets may still show the old `Formula n` / `Term n` syntax, even though the proofs build. Everything is committed.
+
 # Summary of changes for run 83044bfd-c794-4b10-b631-1fb5b9ffb9e0
 Both changes are done and the whole project builds. The only `sorry` is still `cut_elimination` in `MainTheorem.lean`.
 

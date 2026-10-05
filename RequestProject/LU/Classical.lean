@@ -23,55 +23,63 @@ cut-free proof of a sequent `S` made of classical formulas, the invariant `ClGoo
 
 namespace LU
 
+variable {PS : PredSig} {TS : TermSig} [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
 variable {n : ℕ}
 
 open Formula
 
 /-- The negative formulas of a multiset. -/
-def muL (Γ : Multiset (Formula n)) : ℕ := Multiset.card (Γ.filter (fun A => A.pol = .neg))
+def muL (Γ : Multiset (Formula PS TS n)) : ℕ := Multiset.card (Γ.filter (fun A => A.pol = .neg))
 
 /-- The positive formulas of a multiset. -/
-def muR (Δ : Multiset (Formula n)) : ℕ := Multiset.card (Δ.filter (fun A => A.pol = .pos))
+def muR (Δ : Multiset (Formula PS TS n)) : ℕ := Multiset.card (Δ.filter (fun A => A.pol = .pos))
 
 /-- Non-contributing formulas of a left linear zone. -/
-abbrev NCL (Γ : Multiset (Formula n)) : Multiset (Formula n) := Γ.filter (fun A => A.pol ≠ .neg)
+abbrev NCL (Γ : Multiset (Formula PS TS n)) : Multiset (Formula PS TS n) := Γ.filter (fun A => A.pol ≠ .neg)
 
 /-- Non-contributing formulas of a right linear zone. -/
-abbrev NCR (Δ : Multiset (Formula n)) : Multiset (Formula n) := Δ.filter (fun A => A.pol ≠ .pos)
+abbrev NCR (Δ : Multiset (Formula PS TS n)) : Multiset (Formula PS TS n) := Δ.filter (fun A => A.pol ≠ .pos)
 
-theorem mu_mk (L : Multiset (Formula n)) (C D : Finset (Formula n)) (R : Multiset (Formula n)) :
+section
+
+omit [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
+theorem mu_mk (L : Multiset (Formula PS TS n)) (C D : Finset (Formula PS TS n)) (R : Multiset (Formula PS TS n)) :
     mu ⟪L ; C ⊢ D ; R⟫ = muL L + muR R := rfl
 
-@[simp] theorem muL_zero : muL (0 : Multiset (Formula n)) = 0 := rfl
-@[simp] theorem muR_zero : muR (0 : Multiset (Formula n)) = 0 := rfl
-@[simp] theorem muL_add (a b : Multiset (Formula n)) : muL (a + b) = muL a + muL b := by
+@[simp] theorem muL_zero : muL (0 : Multiset (Formula PS TS n)) = 0 := rfl
+@[simp] theorem muR_zero : muR (0 : Multiset (Formula PS TS n)) = 0 := rfl
+@[simp] theorem muL_add (a b : Multiset (Formula PS TS n)) : muL (a + b) = muL a + muL b := by
   simp [muL]
-@[simp] theorem muR_add (a b : Multiset (Formula n)) : muR (a + b) = muR a + muR b := by
+@[simp] theorem muR_add (a b : Multiset (Formula PS TS n)) : muR (a + b) = muR a + muR b := by
   simp [muR]
-@[simp] theorem muL_cons (A : Formula n) (a : Multiset (Formula n)) :
+@[simp] theorem muL_cons (A : Formula PS TS n) (a : Multiset (Formula PS TS n)) :
     muL (A ::ₘ a) = (if A.pol = .neg then 1 else 0) + muL a := by
   simp only [muL, Multiset.filter_cons]; split_ifs <;> simp [add_comm]
-@[simp] theorem muR_cons (A : Formula n) (a : Multiset (Formula n)) :
+@[simp] theorem muR_cons (A : Formula PS TS n) (a : Multiset (Formula PS TS n)) :
     muR (A ::ₘ a) = (if A.pol = .pos then 1 else 0) + muR a := by
   simp only [muR, Multiset.filter_cons]; split_ifs <;> simp [add_comm]
-@[simp] theorem muL_singleton (A : Formula n) : muL {A} = if A.pol = .neg then 1 else 0 := by
+@[simp] theorem muL_singleton (A : Formula PS TS n) : muL {A} = if A.pol = .neg then 1 else 0 := by
   simpa using muL_cons A 0
-@[simp] theorem muR_singleton (A : Formula n) : muR {A} = if A.pol = .pos then 1 else 0 := by
+@[simp] theorem muR_singleton (A : Formula PS TS n) : muR {A} = if A.pol = .pos then 1 else 0 := by
   simpa using muR_cons A 0
 
-theorem NCL_eq_self {Γ : Multiset (Formula n)} (h : muL Γ = 0) : NCL Γ = Γ := by
+theorem NCL_eq_self {Γ : Multiset (Formula PS TS n)} (h : muL Γ = 0) : NCL Γ = Γ := by
   rw [Multiset.filter_eq_self]
   intro A hA hA'
   have : 0 < muL Γ := Multiset.card_pos_iff_exists_mem.2 ⟨A, by simp [hA, hA']⟩
   omega
 
-theorem NCR_eq_self {Δ : Multiset (Formula n)} (h : muR Δ = 0) : NCR Δ = Δ := by
+theorem NCR_eq_self {Δ : Multiset (Formula PS TS n)} (h : muR Δ = 0) : NCR Δ = Δ := by
   rw [Multiset.filter_eq_self]
   intro A hA hA'
   have : 0 < muR Δ := Multiset.card_pos_iff_exists_mem.2 ⟨A, by simp [hA, hA']⟩
   omega
 
-theorem NCL_le_of_add {A Γ X : Multiset (Formula n)} (h : NCL (A + Γ) ≤ A + X) : NCL Γ ≤ X := by
+end
+
+theorem NCL_le_of_add {A Γ X : Multiset (Formula PS TS n)} (h : NCL (A + Γ) ≤ A + X) : NCL Γ ≤ X := by
   classical
   rw [Multiset.le_iff_count] at h ⊢
   intro a
@@ -79,7 +87,7 @@ theorem NCL_le_of_add {A Γ X : Multiset (Formula n)} (h : NCL (A + Γ) ≤ A + 
   simp only [Multiset.filter_add, Multiset.count_add, Multiset.count_filter] at this ⊢
   split_ifs at this ⊢ <;> omega
 
-theorem NCR_le_of_add {A Γ X : Multiset (Formula n)} (h : NCR (A + Γ) ≤ A + X) : NCR Γ ≤ X := by
+theorem NCR_le_of_add {A Γ X : Multiset (Formula PS TS n)} (h : NCR (A + Γ) ≤ A + X) : NCR Γ ≤ X := by
   classical
   rw [Multiset.le_iff_count] at h ⊢
   intro a
@@ -88,28 +96,28 @@ theorem NCR_le_of_add {A Γ X : Multiset (Formula n)} (h : NCR (A + Γ) ≤ A + 
   split_ifs at this ⊢ <;> omega
 
 /-- Shape of the sequents occurring in a cut-free proof of a classical sequent. -/
-abbrev ClShape (S : Sequent n) : Prop := AllIn IsClassical S
+abbrev ClShape (S : Sequent PS TS n) : Prop := AllIn IsClassical S
 
 /-- Provability within the classical fragment. -/
-abbrev ClWithin (S : Sequent n) : Prop := ProvableWithin .classical S
+abbrev ClWithin (S : Sequent PS TS n) : Prop := ProvableWithin .classical S
 
 /-- The invariant proved by induction on a cut-free proof (see the module docstring). -/
-def ClGood (S : Sequent n) : Prop :=
+def ClGood (S : Sequent PS TS n) : Prop :=
   (mu S ≤ 1 → ClWithin S) ∧
-  (2 ≤ mu S → ∀ (TL : Multiset (Formula n)) (TC TD : Finset (Formula n))
-    (TR : Multiset (Formula n)), ClassicalSeq ⟪TL ; TC ⊢ TD ; TR⟫ →
+  (2 ≤ mu S → ∀ (TL : Multiset (Formula PS TS n)) (TC TD : Finset (Formula PS TS n))
+    (TR : Multiset (Formula PS TS n)), ClassicalSeq ⟪TL ; TC ⊢ TD ; TR⟫ →
     NCL S.L ≤ TL → S.CL ⊆ TC → S.CR ⊆ TD → NCR S.R ≤ TR → ClWithin ⟪TL ; TC ⊢ TD ; TR⟫)
 
-theorem ClWithin.classicalSeq {S : Sequent n} (h : ClWithin S) : ClassicalSeq S := by
+theorem ClWithin.classicalSeq {S : Sequent PS TS n} (h : ClWithin S) : ClassicalSeq S := by
   cases h with
   | mk _ _ _ h _ => exact h
 
-theorem cl_within_rule {ps : List (Premise n)} {c T : Sequent n} (hr : Rule ps c) (heq : c = T)
+theorem cl_within_rule {ps : List (Premise PS TS n)} {c T : Sequent PS TS n} (hr : Rule ps c) (heq : c = T)
     (hT : ClassicalSeq T) (hps : ∀ p ∈ ps, p.All ClWithin) : ClWithin T := by
   subst heq; exact .mk' ps c hr hT hps
 
-theorem cl_weakL {L R : Multiset (Formula n)} {C D : Finset (Formula n)}
-    (E : Finset (Formula n)) (h : ClWithin ⟪L ; C ⊢ D ; R⟫) (hE : ∀ A ∈ E, A.IsClassical) :
+theorem cl_weakL {L R : Multiset (Formula PS TS n)} {C D : Finset (Formula PS TS n)}
+    (E : Finset (Formula PS TS n)) (h : ClWithin ⟪L ; C ⊢ D ; R⟫) (hE : ∀ A ∈ E, A.IsClassical) :
     ClWithin ⟪L ; C ∪ E ⊢ D ; R⟫ := by
   induction E using Finset.induction_on with
   | empty => simpa using h
@@ -125,8 +133,8 @@ theorem cl_weakL {L R : Multiset (Formula n)} {C D : Finset (Formula n)}
     · exact hE _ (Finset.mem_insert_self _ _)
     · exact h1.2.1 B hB
 
-theorem cl_weakR {L R : Multiset (Formula n)} {C D : Finset (Formula n)}
-    (E : Finset (Formula n)) (h : ClWithin ⟪L ; C ⊢ D ; R⟫) (hE : ∀ A ∈ E, A.IsClassical) :
+theorem cl_weakR {L R : Multiset (Formula PS TS n)} {C D : Finset (Formula PS TS n)}
+    (E : Finset (Formula PS TS n)) (h : ClWithin ⟪L ; C ⊢ D ; R⟫) (hE : ∀ A ∈ E, A.IsClassical) :
     ClWithin ⟪L ; C ⊢ D ∪ E ; R⟫ := by
   induction E using Finset.induction_on with
   | empty => simpa using h
@@ -143,7 +151,7 @@ theorem cl_weakR {L R : Multiset (Formula n)} {C D : Finset (Formula n)}
     · exact h1.2.2.1 B hB
 
 /-- Weakening of the central zones, towards a target sequent. -/
-theorem cl_weak_to {L R : Multiset (Formula n)} {C D TC TD : Finset (Formula n)}
+theorem cl_weak_to {L R : Multiset (Formula PS TS n)} {C D TC TD : Finset (Formula PS TS n)}
     (h : ClWithin ⟪L ; C ⊢ D ; R⟫) (hT : ClassicalSeq ⟪L ; TC ⊢ TD ; R⟫) (hC : C ⊆ TC)
     (hD : D ⊆ TD) : ClWithin ⟪L ; TC ⊢ TD ; R⟫ := by
   obtain ⟨hA, _⟩ := hT
@@ -152,7 +160,7 @@ theorem cl_weak_to {L R : Multiset (Formula n)} {C D TC TD : Finset (Formula n)}
   rwa [Finset.union_eq_right.2 hC, Finset.union_eq_right.2 hD] at this
 
 /-- Using the invariant of a premise towards a target sequent. -/
-theorem ClGood.apply {p : Sequent n} {TL TR : Multiset (Formula n)} {TC TD : Finset (Formula n)}
+theorem ClGood.apply {p : Sequent PS TS n} {TL TR : Multiset (Formula PS TS n)} {TC TD : Finset (Formula PS TS n)}
     (hp : ClGood p) (hT : ClassicalSeq ⟪TL ; TC ⊢ TD ; TR⟫)
     (hle : mu p ≤ 1 → TL = p.L ∧ TR = p.R) (hL : NCL p.L ≤ TL) (hC : p.CL ⊆ TC)
     (hD : p.CR ⊆ TD) (hR : NCR p.R ≤ TR) : ClWithin ⟪TL ; TC ⊢ TD ; TR⟫ := by
@@ -162,10 +170,10 @@ theorem ClGood.apply {p : Sequent n} {TL TR : Multiset (Formula n)} {TC TD : Fin
   · exact hp.2 (by omega) TL TC TD TR hT hL hC hD hR
 
 /-- Rules for which the conclusion can always be obtained from a premise. -/
-theorem cl_absorb {ps : List (Premise n)} {c : Sequent n} (hr : Rule ps c) (hc : ClShape c)
+theorem cl_absorb {ps : List (Premise PS TS n)} {c : Sequent PS TS n} (hr : Rule ps c) (hc : ClShape c)
     (ih : ∀ q ∈ ps, q.All ClGood) (h1 : mu c ≤ 1 → ∀ q ∈ ps, q.All (fun s => mu s ≤ 1))
-    (h2 : 2 ≤ mu c → ∃ (L : Multiset (Formula n)) (C D : Finset (Formula n))
-      (R : Multiset (Formula n)), Premise.same ⟪L ; C ⊢ D ; R⟫ ∈ ps ∧
+    (h2 : 2 ≤ mu c → ∃ (L : Multiset (Formula PS TS n)) (C D : Finset (Formula PS TS n))
+      (R : Multiset (Formula PS TS n)), Premise.same ⟪L ; C ⊢ D ; R⟫ ∈ ps ∧
       2 ≤ mu ⟪L ; C ⊢ D ; R⟫ ∧ NCL L ≤ NCL c.L ∧ C ⊆ c.CL ∧ D ⊆ c.CR ∧ NCR R ≤ NCR c.R) :
     ClGood c := by
   refine ⟨fun hmu => cl_within_rule hr rfl ⟨hc, hmu⟩ fun q hq =>
@@ -178,9 +186,9 @@ theorem cl_absorb {ps : List (Premise n)} {c : Sequent n} (hr : Rule ps c) (hc :
 /-- Admissible transformations of the contexts in a rule: the identity, and the shift used
 for the eigenvariable condition (`f` acts on the linear zones, `g` on the central zones, and
 `pr` makes a premise out of a sequent of the target scope). -/
-structure CtxMap {n m : ℕ} (f : Multiset (Formula n) → Multiset (Formula m))
-    (g : Finset (Formula n) → Finset (Formula m)) (pr : Sequent m → Premise n) : Prop where
-  all : ∀ (Q : ∀ {k : ℕ}, Sequent k → Prop) (s : Sequent m), (pr s).All Q ↔ Q s
+structure CtxMap {n m : ℕ} (f : Multiset (Formula PS TS n) → Multiset (Formula PS TS m))
+    (g : Finset (Formula PS TS n) → Finset (Formula PS TS m)) (pr : Sequent PS TS m → Premise PS TS n) : Prop where
+  all : ∀ (Q : ∀ {k : ℕ}, Sequent PS TS k → Prop) (s : Sequent PS TS m), (pr s).All Q ↔ Q s
   add : ∀ a b, f (a + b) = f a + f b
   cl : ∀ a, (∀ A ∈ a, A.IsClassical) → ∀ A ∈ f a, A.IsClassical
   muL : ∀ a, muL (f a) = muL a
@@ -193,7 +201,7 @@ structure CtxMap {n m : ℕ} (f : Multiset (Formula n) → Multiset (Formula m))
   monoc : ∀ a b, a ⊆ b → g a ⊆ g b
 
 theorem ctxMap_id :
-    CtxMap (id : Multiset (Formula n) → Multiset (Formula n)) id Premise.same where
+    CtxMap (id : Multiset (Formula PS TS n) → Multiset (Formula PS TS n)) id Premise.same where
   all _ _ := Iff.rfl
   add _ _ := rfl
   cl _ h := h
@@ -207,7 +215,7 @@ theorem ctxMap_id :
   monoc _ _ h := h
 
 theorem ctxMap_sh :
-    CtxMap (sh : Multiset (Formula n) → Multiset (Formula (n + 1))) shc Premise.up where
+    CtxMap (sh : Multiset (Formula PS TS n) → Multiset (Formula PS TS (n + 1))) shc Premise.up where
   all _ _ := Iff.rfl
   add a b := Multiset.map_add _ _ _
   cl _ h := forall_mem_sh subClosed_classical h
@@ -220,18 +228,19 @@ theorem ctxMap_sh :
   clc _ h := forall_mem_shc subClosed_classical h
   monoc _ _ h := Finset.image_subset_image h
 
-theorem forall_mem_add_iff {F : ∀ {n : ℕ}, Formula n → Prop} {a b : Multiset (Formula n)} :
+omit [DecidableEq PS.Pred] [DecidableEq TS.Func] in
+theorem forall_mem_add_iff {F : ∀ {n : ℕ}, Formula PS TS n → Prop} {a b : Multiset (Formula PS TS n)} :
     (∀ A ∈ a + b, F A) ↔ (∀ A ∈ a, F A) ∧ (∀ A ∈ b, F A) := by
   simp only [Multiset.mem_add, or_imp, forall_and]
 
-theorem forall_mem_union_iff {F : ∀ {n : ℕ}, Formula n → Prop} {a b : Finset (Formula n)} :
+theorem forall_mem_union_iff {F : ∀ {n : ℕ}, Formula PS TS n → Prop} {a b : Finset (Formula PS TS n)} :
     (∀ A ∈ a ∪ b, F A) ↔ (∀ A ∈ a, F A) ∧ (∀ A ∈ b, F A) := by
   simp only [Finset.mem_union, or_imp, forall_and]
 
 /-- Decomposition of a target sequent containing the non-contributing formulas `L0`, `R0`
 and the central formulas `C0`, `D0` of the principal part of a rule. -/
-theorem cl_tgt_decomp {TL TR L0 R0 Γ Δ : Multiset (Formula n)}
-    {TC TD C0 D0 Γ' Δ' : Finset (Formula n)}
+theorem cl_tgt_decomp {TL TR L0 R0 Γ Δ : Multiset (Formula PS TS n)}
+    {TC TD C0 D0 Γ' Δ' : Finset (Formula PS TS n)}
     (hL0 : NCL L0 = L0) (hR0 : NCR R0 = R0) (hL : NCL (L0 + Γ) ≤ TL)
     (hC : C0 ∪ Γ' ⊆ TC) (hD : D0 ∪ Δ' ⊆ TD) (hR : NCR (R0 + Δ) ≤ TR) :
     ∃ Tl Tc Td Tr, TL = L0 + Tl ∧ TC = C0 ∪ Tc ∧ TD = D0 ∪ Td ∧ TR = R0 + Tr ∧ NCL Γ ≤ Tl ∧
@@ -251,7 +260,8 @@ theorem cl_tgt_decomp {TL TR L0 R0 Γ Δ : Multiset (Formula n)}
   · exact (Finset.union_eq_right.2 (Finset.subset_union_left.trans hC)).symm
   · exact (Finset.union_eq_right.2 (Finset.subset_union_left.trans hD)).symm
 
-theorem classicalSeq_parts {L R : Multiset (Formula n)} {C D : Finset (Formula n)}
+omit [DecidableEq PS.Pred] [DecidableEq TS.Func] in
+theorem classicalSeq_parts {L R : Multiset (Formula PS TS n)} {C D : Finset (Formula PS TS n)}
     (h : ClassicalSeq ⟪L ; C ⊢ D ; R⟫) :
     (∀ A ∈ L, A.IsClassical) ∧ (∀ A ∈ C, A.IsClassical) ∧ (∀ A ∈ D, A.IsClassical) ∧
       (∀ A ∈ R, A.IsClassical) ∧ muL L + muR R ≤ 1 :=
@@ -259,10 +269,10 @@ theorem classicalSeq_parts {L R : Multiset (Formula n)} {C D : Finset (Formula n
 
 /-- A target of a premise of a rule, obtained from the decomposition of a target of the
 conclusion. -/
-theorem cl_premise_tgt {m : ℕ} {f : Multiset (Formula n) → Multiset (Formula m)}
-    {g : Finset (Formula n) → Finset (Formula m)} {pr : Sequent m → Premise n}
-    (hf : CtxMap f g pr) {L1 R1 : Multiset (Formula m)} {C1 D1 : Finset (Formula m)}
-    {Γ Δ Tl Tr : Multiset (Formula n)} {Γ' Δ' Tc Td : Finset (Formula n)}
+theorem cl_premise_tgt {m : ℕ} {f : Multiset (Formula PS TS n) → Multiset (Formula PS TS m)}
+    {g : Finset (Formula PS TS n) → Finset (Formula PS TS m)} {pr : Sequent PS TS m → Premise PS TS n}
+    (hf : CtxMap f g pr) {L1 R1 : Multiset (Formula PS TS m)} {C1 D1 : Finset (Formula PS TS m)}
+    {Γ Δ Tl Tr : Multiset (Formula PS TS n)} {Γ' Δ' Tc Td : Finset (Formula PS TS n)}
     (h1 : muL L1 + muR R1 = 0)
     (hp : ClShape ⟪L1 + f Γ ; C1 ∪ g Γ' ⊢ D1 ∪ g Δ' ; R1 + f Δ⟫)
     (ih : ClGood ⟪L1 + f Γ ; C1 ∪ g Γ' ⊢ D1 ∪ g Δ' ; R1 + f Δ⟫)
@@ -289,10 +299,10 @@ theorem cl_premise_tgt {m : ℕ} {f : Multiset (Formula n) → Multiset (Formula
 
 /-- One-premise rules whose principal formula and active formulas do not contribute to `μ`:
 the conclusion is obtained by applying the same rule to a target of the premise. -/
-theorem cl_reapply1 {m : ℕ} {f : Multiset (Formula n) → Multiset (Formula m)}
-    {g : Finset (Formula n) → Finset (Formula m)} {pr : Sequent m → Premise n}
-    (hf : CtxMap f g pr) {L0 R0 Γ Δ : Multiset (Formula n)} {C0 D0 Γ' Δ' : Finset (Formula n)}
-    {L1 R1 : Multiset (Formula m)} {C1 D1 : Finset (Formula m)}
+theorem cl_reapply1 {m : ℕ} {f : Multiset (Formula PS TS n) → Multiset (Formula PS TS m)}
+    {g : Finset (Formula PS TS n) → Finset (Formula PS TS m)} {pr : Sequent PS TS m → Premise PS TS n}
+    (hf : CtxMap f g pr) {L0 R0 Γ Δ : Multiset (Formula PS TS n)} {C0 D0 Γ' Δ' : Finset (Formula PS TS n)}
+    {L1 R1 : Multiset (Formula PS TS m)} {C1 D1 : Finset (Formula PS TS m)}
     (hr : ∀ Γ Γ' Δ' Δ, Rule [pr ⟪L1 + f Γ ; C1 ∪ g Γ' ⊢ D1 ∪ g Δ' ; R1 + f Δ⟫]
       ⟪L0 + Γ ; C0 ∪ Γ' ⊢ D0 ∪ Δ' ; R0 + Δ⟫)
     (h0 : muL L0 + muR R0 = 0) (h1 : muL L1 + muR R1 = 0)
@@ -319,8 +329,8 @@ theorem cl_reapply1 {m : ℕ} {f : Multiset (Formula n) → Multiset (Formula m)
 
 /-- Two-premise additive rules whose principal formula and active formulas do not
 contribute to `μ`. -/
-theorem cl_reapply2 {L0 R0 L1 R1 L2 R2 Γ Δ : Multiset (Formula n)}
-    {C0 D0 C1 D1 C2 D2 Γ' Δ' : Finset (Formula n)}
+theorem cl_reapply2 {L0 R0 L1 R1 L2 R2 Γ Δ : Multiset (Formula PS TS n)}
+    {C0 D0 C1 D1 C2 D2 Γ' Δ' : Finset (Formula PS TS n)}
     (hr : ∀ Γ Γ' Δ' Δ, Rule [.same ⟪L1 + Γ ; C1 ∪ Γ' ⊢ D1 ∪ Δ' ; R1 + Δ⟫,
       .same ⟪L2 + Γ ; C2 ∪ Γ' ⊢ D2 ∪ Δ' ; R2 + Δ⟫] ⟪L0 + Γ ; C0 ∪ Γ' ⊢ D0 ∪ Δ' ; R0 + Δ⟫)
     (h0 : muL L0 + muR R0 = 0) (h1 : muL L1 + muR R1 = 0) (h2 : muL L2 + muR R2 = 0)
@@ -352,7 +362,7 @@ theorem cl_reapply2 {L0 R0 L1 R1 L2 R2 Γ Δ : Multiset (Formula n)}
     cl_premise_tgt ctxMap_id h2 hp2 ih2 (hmu2 ▸ h) hTL.2 hTC.2 hTD.2 hTR.2 (by omega)
       hl hc' hd hr'⟩
 
-theorem cl_zeroL (Γ Δ : Multiset (Formula n)) (hc : ClShape ⟪zero ::ₘ Γ ; ∅ ⊢ ∅ ; Δ⟫) :
+theorem cl_zeroL (Γ Δ : Multiset (Formula PS TS n)) (hc : ClShape ⟪zero ::ₘ Γ ; ∅ ⊢ ∅ ; Δ⟫) :
     ClGood ⟪zero ::ₘ Γ ; ∅ ⊢ ∅ ; Δ⟫ := by
   refine ⟨fun h1 => cl_within_rule (Rule.zeroL Γ Δ) rfl ⟨hc, h1⟩ (by simp),
     fun _ TL TC TD TR hT hL _ _ _ => ?_⟩
@@ -364,7 +374,7 @@ theorem cl_zeroL (Γ Δ : Multiset (Formula n)) (hc : ClShape ⟪zero ::ₘ Γ ;
   exact cl_weak_to hw hT (Finset.empty_subset _) (Finset.empty_subset _)
 
 /-- The "bad" permeability rule on the left: a negative formula enters the central zone. -/
-theorem cl_inL_neg {Γ Δ : Multiset (Formula n)} {Γ' Δ' : Finset (Formula n)} {A : Formula n}
+theorem cl_inL_neg {Γ Δ : Multiset (Formula PS TS n)} {Γ' Δ' : Finset (Formula PS TS n)} {A : Formula PS TS n}
     (hA : A.pol = .neg)
     (hc : ClShape ⟪Γ ; insert A Γ' ⊢ Δ' ; Δ⟫) (ih : ClGood ⟪A ::ₘ Γ ; Γ' ⊢ Δ' ; Δ⟫) :
     ClGood ⟪Γ ; insert A Γ' ⊢ Δ' ; Δ⟫ := by
@@ -387,7 +397,7 @@ theorem cl_inL_neg {Γ Δ : Multiset (Formula n)} {Γ' Δ' : Finset (Formula n)}
       ((Finset.subset_insert _ _).trans hC) hD hR
 
 /-- The "bad" permeability rule on the right: a positive formula enters the central zone. -/
-theorem cl_inR_pos {Γ Δ : Multiset (Formula n)} {Γ' Δ' : Finset (Formula n)} {A : Formula n}
+theorem cl_inR_pos {Γ Δ : Multiset (Formula PS TS n)} {Γ' Δ' : Finset (Formula PS TS n)} {A : Formula PS TS n}
     (hA : A.pol = .pos)
     (hc : ClShape ⟪Γ ; Γ' ⊢ insert A Δ' ; Δ⟫) (ih : ClGood ⟪Γ ; Γ' ⊢ Δ' ; A ::ₘ Δ⟫) :
     ClGood ⟪Γ ; Γ' ⊢ insert A Δ' ; Δ⟫ := by
@@ -409,7 +419,11 @@ theorem cl_inR_pos {Γ Δ : Multiset (Formula n)} {Γ' Δ' : Finset (Formula n)}
   · exact ih.2 (by omega) TL TC TD TR hT hL hC ((Finset.subset_insert _ _).trans hD)
       (by rw [hN]; exact hR)
 
-theorem Formula.IsClassical.pol_ne_neu {A : Formula n} (h : A.IsClassical) : A.pol ≠ .neu := by
+section
+
+omit [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
+theorem Formula.IsClassical.pol_ne_neu {A : Formula PS TS n} (h : A.IsClassical) : A.pol ≠ .neu := by
   induction A with
   | atom p ts => exact h
   | one => simp [pol]
@@ -428,24 +442,26 @@ theorem Formula.IsClassical.pol_ne_neu {A : Formula n} (h : A.IsClassical) : A.p
   | cex A => simp [pol]
   | _ => exact h.elim
 
-theorem Formula.IsClassical.neg_of_ne_pos {A : Formula n} (h : A.IsClassical) (h' : A.pol ≠ .pos) :
+theorem Formula.IsClassical.neg_of_ne_pos {A : Formula PS TS n} (h : A.IsClassical) (h' : A.pol ≠ .pos) :
     A.pol = .neg := by
   have := h.pol_ne_neu; revert this h'; cases A.pol <;> simp
 
-theorem Formula.IsClassical.pos_of_ne_neg {A : Formula n} (h : A.IsClassical) (h' : A.pol ≠ .neg) :
+theorem Formula.IsClassical.pos_of_ne_neg {A : Formula PS TS n} (h : A.IsClassical) (h' : A.pol ≠ .neg) :
     A.pol = .pos := by
   have := h.pol_ne_neu; revert this h'; cases A.pol <;> simp
 
-theorem ClShape.rhead {Γ Δ : Multiset (Formula n)} {Γ' Δ' : Finset (Formula n)} {C : Formula n}
+theorem ClShape.rhead {Γ Δ : Multiset (Formula PS TS n)} {Γ' Δ' : Finset (Formula PS TS n)} {C : Formula PS TS n}
     (h : ClShape ⟪Γ ; Γ' ⊢ Δ' ; C ::ₘ Δ⟫) : C.IsClassical :=
   (allIn_mk.1 h).2.2.2 _ (Multiset.mem_cons_self _ _)
 
-theorem ClShape.lhead {Γ Δ : Multiset (Formula n)} {Γ' Δ' : Finset (Formula n)} {C : Formula n}
+theorem ClShape.lhead {Γ Δ : Multiset (Formula PS TS n)} {Γ' Δ' : Finset (Formula PS TS n)} {C : Formula PS TS n}
     (h : ClShape ⟪C ::ₘ Γ ; Γ' ⊢ Δ' ; Δ⟫) : C.IsClassical :=
   (allIn_mk.1 h).1 _ (Multiset.mem_cons_self _ _)
 
+end
+
 /-- One-premise rules where every target of the conclusion is a target of the premise. -/
-theorem cl_absorb1 {c : Sequent n} {L R : Multiset (Formula n)} {C D : Finset (Formula n)}
+theorem cl_absorb1 {c : Sequent PS TS n} {L R : Multiset (Formula PS TS n)} {C D : Finset (Formula PS TS n)}
     (hr : Rule [.same ⟪L ; C ⊢ D ; R⟫] c) (hc : ClShape c) (ih : ClGood ⟪L ; C ⊢ D ; R⟫)
     (hmu : mu ⟪L ; C ⊢ D ; R⟫ = mu c) (hL : NCL L ≤ NCL c.L) (hC : C ⊆ c.CL) (hD : D ⊆ c.CR)
     (hR : NCR R ≤ NCR c.R) : ClGood c :=
@@ -455,8 +471,8 @@ theorem cl_absorb1 {c : Sequent n} {L R : Multiset (Formula n)} {C D : Finset (F
 
 /-- Two-premise rules with a "main" premise carrying the context and a "side" premise with
 `μ = 0`. -/
-theorem cl_absorb_side {ps : List (Premise n)} {s c : Sequent n} {L R : Multiset (Formula n)}
-    {C D : Finset (Formula n)}
+theorem cl_absorb_side {ps : List (Premise PS TS n)} {s c : Sequent PS TS n} {L R : Multiset (Formula PS TS n)}
+    {C D : Finset (Formula PS TS n)}
     (hr : Rule ps c)
     (hps : ∀ q ∈ ps, q = .same ⟪L ; C ⊢ D ; R⟫ ∨ q = .same s) (hp : .same ⟪L ; C ⊢ D ; R⟫ ∈ ps)
     (hc : ClShape c)
@@ -469,8 +485,8 @@ theorem cl_absorb_side {ps : List (Premise n)} {s c : Sequent n} {L R : Multiset
 
 /-- Multiplicative two-premise rules whose principal and active formulas contribute
 to `μ`. -/
-theorem cl_absorb_mult {c : Sequent n} {L1 R1 L2 R2 : Multiset (Formula n)}
-    {C1 D1 C2 D2 : Finset (Formula n)}
+theorem cl_absorb_mult {c : Sequent PS TS n} {L1 R1 L2 R2 : Multiset (Formula PS TS n)}
+    {C1 D1 C2 D2 : Finset (Formula PS TS n)}
     (hr : Rule [.same ⟪L1 ; C1 ⊢ D1 ; R1⟫, .same ⟪L2 ; C2 ⊢ D2 ; R2⟫] c) (hc : ClShape c)
     (ih1 : ClGood ⟪L1 ; C1 ⊢ D1 ; R1⟫) (ih2 : ClGood ⟪L2 ; C2 ⊢ D2 ; R2⟫)
     (hmu : mu ⟪L1 ; C1 ⊢ D1 ; R1⟫ + mu ⟪L2 ; C2 ⊢ D2 ; R2⟫ = mu c + 1)

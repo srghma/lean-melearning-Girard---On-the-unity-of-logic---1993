@@ -34,23 +34,36 @@ With `q, q'` positive atoms the instance is
 
 namespace LU
 
+/-- The predicate signature of the example: two nullary positive predicate symbols,
+`q` (`false`) and `q'` (`true`). -/
+def multPS : PredSig := ⟨Bool, fun _ => 0, fun _ => .pos⟩
+
+instance : DecidableEq multPS.Pred := inferInstanceAs (DecidableEq Bool)
+
+@[simp] theorem multPS_predPol (p : multPS.Pred) : multPS.predPol p = .pos := rfl
+
+/-- The term signature of the example: no function symbols. -/
+def multTS : TermSig := ⟨Empty, Empty.elim⟩
+
+instance : DecidableEq multTS.Func := inferInstanceAs (DecidableEq Empty)
+
 open Formula
 
 /-- A positive nullary atom `q` (a closed formula). -/
-def atQ : Formula 0 := atom ⟨0, 0, .pos⟩ Fin.elim0
+def atQ : Formula multPS multTS 0 := atom false .nil
 
 /-- A second positive nullary atom `q'` (a closed formula). -/
-def atQ' : Formula 0 := atom ⟨1, 0, .pos⟩ Fin.elim0
+def atQ' : Formula multPS multTS 0 := atom true .nil
 
 /-- Left premise `; ⊢ ; ¬q, q`. -/
-def multPrem1 : Sequent 0 := ⟪0 ; ∅ ⊢ ∅ ; neg atQ ::ₘ {atQ}⟫
+def multPrem1 : Sequent multPS multTS 0 := ⟪0 ; ∅ ⊢ ∅ ; neg atQ ::ₘ {atQ}⟫
 
 /-- Right premise `q', ¬q' ; ⊢ ;` (with `P = q'`, `Λ = ¬q'`; as a multiset,
 `¬q' ::ₘ {q'} = q' ::ₘ {¬q'}`). -/
-def multPrem2 : Sequent 0 := ⟪neg atQ' ::ₘ {atQ'} ; ∅ ⊢ ∅ ; 0⟫
+def multPrem2 : Sequent multPS multTS 0 := ⟪neg atQ' ::ₘ {atQ'} ; ∅ ⊢ ∅ ; 0⟫
 
 /-- Conclusion of the multiplicative reading: `¬q ⇒ q', ¬q' ; ⊢ ; q`. -/
-def multConcl : Sequent 0 := ⟪imp (neg atQ) atQ' ::ₘ (0 + {neg atQ'}) ; ∅ ⊢ ∅ ; {atQ} + 0⟫
+def multConcl : Sequent multPS multTS 0 := ⟪imp (neg atQ) atQ' ::ₘ (0 + {neg atQ'}) ; ∅ ⊢ ∅ ; {atQ} + 0⟫
 
 /-- With the multiplicative reading, the paper's invariant for the classical fragment fails:
 both premises are cut-free provable, consist of classical formulas and have `μ = 1`, and

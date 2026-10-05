@@ -10,6 +10,8 @@ public import RequestProject.LU.Classical
 
 namespace LU
 
+variable {PS : PredSig} {TS : TermSig} [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
 variable {n : ℕ}
 
 open Formula
@@ -21,10 +23,10 @@ macro "cl_simp" : tactic => `(tactic| first | (simp [*]; done) | (simp [*]; omeg
 
 set_option maxHeartbeats 4000000 in
 /-- Rule-by-rule analysis for the classical fragment. -/
-theorem Rule.clGood {ps : List (Premise n)} {c : Sequent n} (hr : Rule ps c) (hc : ClShape c)
+theorem Rule.clGood {ps : List (Premise PS TS n)} {c : Sequent PS TS n} (hr : Rule ps c) (hc : ClShape c)
     (hpre : ∀ p ∈ ps, p.All ClShape) (ih : ∀ p ∈ ps, p.All ClGood) : ClGood c := by
   have hr' := hr
-  have hneu : ∀ {n : ℕ} (A : Formula n), A.IsClassical → A.pol ≠ .neu := fun A h => h.pol_ne_neu
+  have hneu : ∀ {n : ℕ} (A : Formula PS TS n), A.IsClassical → A.pol ≠ .neu := fun A h => h.pol_ne_neu
   cases hr
   case ax A => exact cl_absorb hr' hc ih (by simp) (fun h => by
       simp only [mu_mk, muL_singleton, muR_singleton] at h; split_ifs at h <;> simp_all)
@@ -306,7 +308,7 @@ theorem Rule.clGood {ps : List (Premise n)} {c : Sequent n} (hr : Rule ps c) (hc
 
 /-- Main lemma: every cut-free provable sequent made of classical formulas satisfies the
 invariant `ClGood`. -/
-theorem cl_main {S : Sequent n} (h : CutFreeProvable S) (hS : ClShape S) : ClGood S := by
+theorem cl_main {S : Sequent PS TS n} (h : CutFreeProvable S) (hS : ClShape S) : ClGood S := by
   unfold CutFreeProvable at h
   induction h with
   | mk ps c hr _ _ _ ihs ihu =>
@@ -316,7 +318,7 @@ theorem cl_main {S : Sequent n} (h : CutFreeProvable S) (hS : ClShape S) : ClGoo
 
 /-- **Theorem (§6), classical fragment, cut-free version.**  A cut-free provable classical
 sequent is provable within the classical fragment. -/
-theorem classical_within {S : Sequent n} (h : CutFreeProvable S) (hS : ClassicalSeq S) :
+theorem classical_within {S : Sequent PS TS n} (h : CutFreeProvable S) (hS : ClassicalSeq S) :
     ProvableWithin .classical S :=
   (cl_main h hS.1).1 hS.2
 

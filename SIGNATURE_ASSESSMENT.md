@@ -1,5 +1,15 @@
 # Assessment: taking the function and predicate symbols from a signature
 
+> **Status: implemented** with option (B), as a mutual pair `Tm` (terms) / `Tms`
+> (`k`-tuples), in `RequestProject/LU/Syntax.lean`; the whole development is now stated over
+> arbitrary signatures `PS : PredSig`, `TS : TermSig` with `[DecidableEq PS.Pred]` and
+> `[DecidableEq TS.Func]`. The fixed default term is gone (`Formula.shift_injective` is proved
+> by injectivity of renaming), the example in `MultiplicativeReading.lean` uses a concrete
+> signature with two nullary positive predicates and no function symbols, and the
+> substitution of a formula for a predicate symbol is stated for `a : PS.Pred`. The Lean
+> checks below (`RequestProject/SignatureAssessment.lean`) are kept as the record of the
+> assessment.
+
 Proposed design:
 
 ```lean

@@ -17,11 +17,19 @@ This file fixes the language of the unified sequent calculus **LU**
 Every formula receives a polarity (§2, Tables 1 and 2); the polarity function
 `Formula.pol` below is a literal transcription of these tables.
 
+The language is not fixed: the function symbols are taken from a signature `TS : TermSig`
+and the predicate symbols, each with its arity and its polarity, from a signature
+`PS : PredSig`.  Terms `Tm TS n` and `k`-tuples of terms `Tms TS n k` are two mutually
+inductive types, so that a tuple is never a term: every term and every atom has a unique
+representation.
+
 Terms and formulas are *well-scoped by construction* (indexed by the number of free
 variables in scope, with de Bruijn indices `Fin n`), and atoms and function applications
-always have the number of arguments prescribed by the arity of their symbol: `Term 0` and
-`Formula 0` are the closed terms and closed formulas.  The body of a quantifier over
-`Formula n` is a `Formula (n + 1)` whose bound variable is the index `0`.
+always have the number of arguments prescribed by the arity of their symbol: `Tm TS 0` and
+`Formula PS TS 0` are the closed terms and closed formulas.  Formulas have decidable
+equality as soon as the symbols of the signatures do (`[DecidableEq PS.Pred]`,
+`[DecidableEq TS.Func]`).  The body of a quantifier over `Formula PS TS n` is a
+`Formula PS TS (n + 1)` whose bound variable is the index `0`.
 `A[t/x]` (substitution of the term `t` for the bound variable) is `Formula.inst A t`, and the
 eigenvariable condition "`x` not free in the context" is expressed by weakening the context
 into the larger scope (`Formula.shift`).
@@ -130,229 +138,384 @@ def iimp : Pol → Pol → Pol
 
 end Pol
 
-/-! ## Terms and formulas
+/-! ## Signatures -/
 
-Terms and formulas are *well-scoped by construction*: `Term n` and `Formula n` only contain
-free variables taken from `Fin n` (de Bruijn indices `0, …, n-1`), and every function or
-predicate symbol is applied to exactly as many arguments as its arity.  In particular
-`Term 0` is the type of closed terms and `Formula 0` the type of closed formulas.
-The body of a quantifier over `Formula n` is a `Formula (n + 1)`, in which the bound variable
-is the index `0`. -/
+/-- A signature of function symbols: a type of symbols, each with an arity. -/
+structure TermSig where
+  /-- the function symbols -/
+  Func : Type
+  /-- the arity of each function symbol -/
+  arity : Func → ℕ
 
-/-- A function symbol: a name and an arity. -/
-structure Func where
-  name : ℕ
-  arity : ℕ
-  deriving DecidableEq
+/-- A signature of predicate symbols: a type of symbols, each with an arity and a polarity
+("atomic predicates are given with their polarity", §2 and §6). -/
+structure PredSig where
+  /-- the predicate symbols -/
+  Pred : Type
+  /-- the arity of each predicate symbol -/
+  arity : Pred → ℕ
+  /-- the polarity of each predicate symbol -/
+  predPol : Pred → Pol
 
-/-- First-order terms whose free variables are among `Fin n` (de Bruijn indices).
-A function symbol `f` is applied to exactly `f.arity` arguments. -/
-inductive Term (n : ℕ) where
+/-! ## Terms and tuples of terms
+
+Terms over a signature `TS` are *well-scoped by construction*: `Tm TS n` only contains free
+variables taken from `Fin n` (de Bruijn indices `0, …, n-1`).  `Tms TS n k` is the type of
+`k`-tuples of terms.  A function symbol `f` is applied to a tuple of exactly `TS.arity f`
+terms.  Terms and tuples are two different (mutually inductive) types, so a tuple can never
+be used where a term is expected: every term and every atom has a unique representation. -/
+
+mutual
+/-- First-order terms over `TS` whose free variables are among `Fin n`. -/
+inductive Tm (TS : TermSig) (n : ℕ) : Type where
   /-- a variable in scope -/
-  | var : Fin n → Term n
-  /-- `f t₁ … tₖ` with `k = f.arity` -/
-  | func (f : Func) : (Fin f.arity → Term n) → Term n
+  | var : Fin n → Tm TS n
+  /-- `f(t₁, …, tₖ)` with `k = TS.arity f` -/
+  | func (f : TS.Func) : Tms TS n (TS.arity f) → Tm TS n
+/-- `k`-tuples `(t₁, …, tₖ)` of terms over `TS` whose free variables are among `Fin n`. -/
+inductive Tms (TS : TermSig) (n : ℕ) : ℕ → Type where
+  /-- the empty tuple -/
+  | nil : Tms TS n 0
+  /-- `(t, t₁, …, tₖ)` -/
+  | cons {k : ℕ} : Tm TS n → Tms TS n k → Tms TS n (k + 1)
+end
+
+variable {TS : TermSig}
 
 /-- A substitution from scope `n` to scope `m`: a term of scope `m` for each variable. -/
-abbrev Subst (n m : ℕ) := Fin n → Term m
+abbrev Subst (TS : TermSig) (n m : ℕ) := Fin n → Tm TS m
 
-namespace Term
-
-instance {n : ℕ} : Inhabited (Term n) := ⟨func ⟨0, 0⟩ Fin.elim0⟩
-
+mutual
 /-- Renaming of variables along `ρ : Fin n → Fin m`. -/
-def rename {n m : ℕ} (ρ : Fin n → Fin m) : Term n → Term m
-  | var i => var (ρ i)
-  | func f ts => func f (fun i => (ts i).rename ρ)
+def Tm.rename {n m : ℕ} (ρ : Fin n → Fin m) : Tm TS n → Tm TS m
+  | .var i => .var (ρ i)
+  | .func f ts => .func f (ts.rename ρ)
+/-- Renaming of variables in a tuple. -/
+def Tms.rename {n m : ℕ} (ρ : Fin n → Fin m) : {k : ℕ} → Tms TS n k → Tms TS m k
+  | _, .nil => .nil
+  | _, .cons t ts => .cons (t.rename ρ) (ts.rename ρ)
+end
+
+mutual
+/-- Simultaneous substitution of `σ i` for each variable `i`. -/
+def Tm.subst {n m : ℕ} (σ : Subst TS n m) : Tm TS n → Tm TS m
+  | .var i => σ i
+  | .func f ts => .func f (ts.subst σ)
+/-- Simultaneous substitution in a tuple. -/
+def Tms.subst {n m : ℕ} (σ : Subst TS n m) : {k : ℕ} → Tms TS n k → Tms TS m k
+  | _, .nil => .nil
+  | _, .cons t ts => .cons (t.subst σ) (ts.subst σ)
+end
+
+namespace Tms
+
+/-- The `i`-th component of a tuple. -/
+def get {n : ℕ} : {k : ℕ} → Tms TS n k → Fin k → Tm TS n
+  | _, .cons t _, ⟨0, _⟩ => t
+  | _, .cons _ ts, ⟨i + 1, h⟩ => ts.get ⟨i, Nat.lt_of_succ_lt_succ h⟩
+
+@[simp] theorem get_cons_zero {n k : ℕ} (t : Tm TS n) (ts : Tms TS n k) :
+    (cons t ts).get 0 = t := rfl
+
+@[simp] theorem get_cons_succ {n k : ℕ} (t : Tm TS n) (ts : Tms TS n k) (i : Fin k) :
+    (cons t ts).get i.succ = ts.get i := rfl
+
+theorem get_subst {n m : ℕ} (σ : Subst TS n m) :
+    ∀ {k : ℕ} (ts : Tms TS n k) (i : Fin k), (ts.subst σ).get i = (ts.get i).subst σ
+  | _, .cons _ _, ⟨0, _⟩ => rfl
+  | _, .cons _ ts, ⟨i + 1, h⟩ => get_subst σ ts ⟨i, Nat.lt_of_succ_lt_succ h⟩
+
+theorem get_rename {n m : ℕ} (ρ : Fin n → Fin m) :
+    ∀ {k : ℕ} (ts : Tms TS n k) (i : Fin k), (ts.rename ρ).get i = (ts.get i).rename ρ
+  | _, .cons _ _, ⟨0, _⟩ => rfl
+  | _, .cons _ ts, ⟨i + 1, h⟩ => get_rename ρ ts ⟨i, Nat.lt_of_succ_lt_succ h⟩
+
+end Tms
+
+namespace Tm
 
 /-- Weakening: a term of scope `n` seen in scope `n + 1` (all variables lifted by one). -/
-def shift {n : ℕ} (t : Term n) : Term (n + 1) := t.rename Fin.succ
-
-/-- Simultaneous substitution of `σ i` for each variable `i`. -/
-def subst {n m : ℕ} (σ : Subst n m) : Term n → Term m
-  | var i => σ i
-  | func f ts => func f (fun i => (ts i).subst σ)
+def shift {n : ℕ} (t : Tm TS n) : Tm TS (n + 1) := t.rename Fin.succ
 
 @[simp] theorem rename_var {n m : ℕ} (ρ : Fin n → Fin m) (i : Fin n) :
-    (var i).rename ρ = var (ρ i) := rfl
+    (var i : Tm TS n).rename ρ = var (ρ i) := rfl
 
-@[simp] theorem subst_var {n m : ℕ} (σ : Subst n m) (i : Fin n) : (var i).subst σ = σ i := rfl
+@[simp] theorem subst_var {n m : ℕ} (σ : Subst TS n m) (i : Fin n) :
+    (var i : Tm TS n).subst σ = σ i := rfl
 
-@[simp] theorem shift_var {n : ℕ} (i : Fin n) : (var i).shift = var i.succ := rfl
+@[simp] theorem shift_var {n : ℕ} (i : Fin n) : (var i : Tm TS n).shift = var i.succ := rfl
 
-theorem rename_rename {n m k : ℕ} (ρ : Fin n → Fin m) (ρ' : Fin m → Fin k) :
-    ∀ t : Term n, (t.rename ρ).rename ρ' = t.rename (ρ' ∘ ρ)
-  | var i => rfl
-  | func f ts => by
-    simp only [rename]; congr 1; funext i; exact rename_rename ρ ρ' (ts i)
+end Tm
 
-theorem subst_rename {n m k : ℕ} (ρ : Fin n → Fin m) (σ : Subst m k) :
-    ∀ t : Term n, (t.rename ρ).subst σ = t.subst (σ ∘ ρ)
-  | var i => rfl
-  | func f ts => by
-    simp only [rename, subst]; congr 1; funext i; exact subst_rename ρ σ (ts i)
+mutual
+theorem Tm.rename_rename {n m k : ℕ} (ρ : Fin n → Fin m) (ρ' : Fin m → Fin k) :
+    ∀ t : Tm TS n, (t.rename ρ).rename ρ' = t.rename (ρ' ∘ ρ)
+  | .var _ => rfl
+  | .func f ts => by simp only [Tm.rename, Tms.rename_rename ρ ρ' ts]
+theorem Tms.rename_rename {n m k : ℕ} (ρ : Fin n → Fin m) (ρ' : Fin m → Fin k) :
+    ∀ {j : ℕ} (ts : Tms TS n j), (ts.rename ρ).rename ρ' = ts.rename (ρ' ∘ ρ)
+  | _, .nil => rfl
+  | _, .cons t ts => by
+    simp only [Tms.rename, Tm.rename_rename ρ ρ' t, Tms.rename_rename ρ ρ' ts]
+end
 
-theorem rename_subst {n m k : ℕ} (σ : Subst n m) (ρ : Fin m → Fin k) :
-    ∀ t : Term n, (t.subst σ).rename ρ = t.subst (fun i => (σ i).rename ρ)
-  | var i => rfl
-  | func f ts => by
-    simp only [rename, subst]; congr 1; funext i; exact rename_subst σ ρ (ts i)
+mutual
+theorem Tm.subst_rename {n m k : ℕ} (ρ : Fin n → Fin m) (σ : Subst TS m k) :
+    ∀ t : Tm TS n, (t.rename ρ).subst σ = t.subst (σ ∘ ρ)
+  | .var _ => rfl
+  | .func f ts => by simp only [Tm.rename, Tm.subst, Tms.subst_rename ρ σ ts]
+theorem Tms.subst_rename {n m k : ℕ} (ρ : Fin n → Fin m) (σ : Subst TS m k) :
+    ∀ {j : ℕ} (ts : Tms TS n j), (ts.rename ρ).subst σ = ts.subst (σ ∘ ρ)
+  | _, .nil => rfl
+  | _, .cons t ts => by
+    simp only [Tms.rename, Tms.subst, Tm.subst_rename ρ σ t, Tms.subst_rename ρ σ ts]
+end
 
-theorem subst_subst {n m k : ℕ} (σ : Subst n m) (τ : Subst m k) :
-    ∀ t : Term n, (t.subst σ).subst τ = t.subst (fun i => (σ i).subst τ)
-  | var i => rfl
-  | func f ts => by
-    simp only [subst]; congr 1; funext i; exact subst_subst σ τ (ts i)
+mutual
+theorem Tm.rename_subst {n m k : ℕ} (σ : Subst TS n m) (ρ : Fin m → Fin k) :
+    ∀ t : Tm TS n, (t.subst σ).rename ρ = t.subst (fun i => (σ i).rename ρ)
+  | .var _ => rfl
+  | .func f ts => by simp only [Tm.rename, Tm.subst, Tms.rename_subst σ ρ ts]
+theorem Tms.rename_subst {n m k : ℕ} (σ : Subst TS n m) (ρ : Fin m → Fin k) :
+    ∀ {j : ℕ} (ts : Tms TS n j), (ts.subst σ).rename ρ = ts.subst (fun i => (σ i).rename ρ)
+  | _, .nil => rfl
+  | _, .cons t ts => by
+    simp only [Tms.rename, Tms.subst, Tm.rename_subst σ ρ t, Tms.rename_subst σ ρ ts]
+end
 
-@[simp] theorem subst_var_eq {n : ℕ} : ∀ t : Term n, t.subst var = t
-  | var i => rfl
-  | func f ts => by
-    simp only [subst]; congr 1; funext i; exact subst_var_eq (ts i)
+mutual
+theorem Tm.subst_subst {n m k : ℕ} (σ : Subst TS n m) (τ : Subst TS m k) :
+    ∀ t : Tm TS n, (t.subst σ).subst τ = t.subst (fun i => (σ i).subst τ)
+  | .var _ => rfl
+  | .func f ts => by simp only [Tm.subst, Tms.subst_subst σ τ ts]
+theorem Tms.subst_subst {n m k : ℕ} (σ : Subst TS n m) (τ : Subst TS m k) :
+    ∀ {j : ℕ} (ts : Tms TS n j), (ts.subst σ).subst τ = ts.subst (fun i => (σ i).subst τ)
+  | _, .nil => rfl
+  | _, .cons t ts => by
+    simp only [Tms.subst, Tm.subst_subst σ τ t, Tms.subst_subst σ τ ts]
+end
 
-theorem rename_eq_subst {n m : ℕ} (ρ : Fin n → Fin m) :
-    ∀ t : Term n, t.rename ρ = t.subst (fun i => var (ρ i))
-  | var i => rfl
-  | func f ts => by
-    simp only [rename, subst]; congr 1; funext i; exact rename_eq_subst ρ (ts i)
+mutual
+@[simp] theorem Tm.subst_var_eq {n : ℕ} : ∀ t : Tm TS n, t.subst Tm.var = t
+  | .var _ => rfl
+  | .func f ts => by simp only [Tm.subst, Tms.subst_var_eq ts]
+@[simp] theorem Tms.subst_var_eq {n : ℕ} : ∀ {j : ℕ} (ts : Tms TS n j), ts.subst Tm.var = ts
+  | _, .nil => rfl
+  | _, .cons t ts => by simp only [Tms.subst, Tm.subst_var_eq t, Tms.subst_var_eq ts]
+end
 
-@[simp] theorem shift_subst_cons {n m : ℕ} (σ : Subst n m) (s : Term m) (t : Term n) :
+mutual
+theorem Tm.rename_eq_subst {n m : ℕ} (ρ : Fin n → Fin m) :
+    ∀ t : Tm TS n, t.rename ρ = t.subst (fun i => Tm.var (ρ i))
+  | .var _ => rfl
+  | .func f ts => by simp only [Tm.rename, Tm.subst, Tms.rename_eq_subst ρ ts]
+theorem Tms.rename_eq_subst {n m : ℕ} (ρ : Fin n → Fin m) :
+    ∀ {j : ℕ} (ts : Tms TS n j), ts.rename ρ = ts.subst (fun i => Tm.var (ρ i))
+  | _, .nil => rfl
+  | _, .cons t ts => by
+    simp only [Tms.rename, Tms.subst, Tm.rename_eq_subst ρ t, Tms.rename_eq_subst ρ ts]
+end
+
+mutual
+/-- Renaming along an injective map is injective. -/
+theorem Tm.rename_injective {n m : ℕ} {ρ : Fin n → Fin m} (hρ : Function.Injective ρ) :
+    ∀ s t : Tm TS n, s.rename ρ = t.rename ρ → s = t
+  | .var i, .var j, h => by simp only [Tm.rename, Tm.var.injEq] at h; rw [hρ h]
+  | .func f ts, .func g us, h => by
+    simp only [Tm.rename, Tm.func.injEq] at h
+    obtain ⟨rfl, h⟩ := h
+    rw [Tms.rename_injective hρ ts us (eq_of_heq h)]
+  | .var _, .func _ _, h => by simp [Tm.rename] at h
+  | .func _ _, .var _, h => by simp [Tm.rename] at h
+/-- Renaming a tuple along an injective map is injective. -/
+theorem Tms.rename_injective {n m : ℕ} {ρ : Fin n → Fin m} (hρ : Function.Injective ρ) :
+    ∀ {j : ℕ} (ss ts : Tms TS n j), ss.rename ρ = ts.rename ρ → ss = ts
+  | _, .nil, .nil, _ => rfl
+  | _, .cons s ss, .cons t ts, h => by
+    simp only [Tms.rename, Tms.cons.injEq] at h
+    rw [Tm.rename_injective hρ s t h.1, Tms.rename_injective hρ ss ts h.2]
+end
+
+namespace Tm
+
+@[simp] theorem shift_subst_cons {n m : ℕ} (σ : Subst TS n m) (s : Tm TS m) (t : Tm TS n) :
     t.shift.subst (Fin.cons s σ) = t.subst σ := by
   simp only [shift, subst_rename]; rfl
 
-theorem shift_subst {n m : ℕ} (σ : Subst n m) (t : Term n) :
+theorem shift_subst {n m : ℕ} (σ : Subst TS n m) (t : Tm TS n) :
     (t.subst σ).shift = t.subst (fun i => (σ i).shift) := by
   simp only [shift, rename_subst]
 
-/-- Decidable equality of terms (by recursion; the arguments of a function symbol are compared
-pointwise, there are finitely many of them). -/
-def decEq {n : ℕ} : (s t : Term n) → Decidable (s = t)
+end Tm
+
+/-! ### Decidable equality of terms -/
+
+section DecEq
+
+variable [DecidableEq TS.Func]
+
+mutual
+/-- Decidable equality of terms (given decidable equality of function symbols). -/
+def Tm.decEq {n : ℕ} : (s t : Tm TS n) → Decidable (s = t)
   | .var i, .var j =>
     if h : i = j then isTrue (h ▸ rfl) else isFalse (by intro e; cases e; exact h rfl)
   | .var _, .func _ _ => isFalse (by intro e; cases e)
   | .func _ _, .var _ => isFalse (by intro e; cases e)
   | .func f ts, .func g us =>
-    if hf : f = g then by
-      subst hf
-      exact @decidable_of_iff _ _ (by
-        constructor
-        · intro h; exact congrArg _ (funext h)
-        · intro h; cases h; intro i; rfl)
-        (@Fintype.decidableForallFintype _ _ (fun i => decEq (ts i) (us i)) _)
+    if hf : f = g then
+      match g, hf, us with
+      | _, rfl, us =>
+        match Tms.decEq ts us with
+        | isTrue h => isTrue (h ▸ rfl)
+        | isFalse h => isFalse (by intro e; cases e; exact h rfl)
     else isFalse (by intro e; cases e; exact hf rfl)
+/-- Decidable equality of tuples of terms. -/
+def Tms.decEq {n : ℕ} : {k : ℕ} → (ss ts : Tms TS n k) → Decidable (ss = ts)
+  | _, .nil, .nil => isTrue rfl
+  | _, .cons s ss, .cons t ts =>
+    match Tm.decEq s t, Tms.decEq ss ts with
+    | isTrue h, isTrue h' => isTrue (h ▸ h' ▸ rfl)
+    | isFalse h, _ => isFalse (by intro e; cases e; exact h rfl)
+    | _, isFalse h => isFalse (by intro e; cases e; exact h rfl)
+end
 
-instance {n : ℕ} : DecidableEq (Term n) := decEq
+instance {n : ℕ} : DecidableEq (Tm TS n) := Tm.decEq
+instance {n k : ℕ} : DecidableEq (Tms TS n k) := Tms.decEq
 
-end Term
+end DecEq
 
 namespace Subst
 
 /-- The identity substitution. -/
-abbrev id (n : ℕ) : Subst n n := Term.var
+abbrev id (TS : TermSig) (n : ℕ) : Subst TS n n := Tm.var
 
 /-- Lifting a substitution under a binder: the bound variable `0` is kept, the other
 variables are substituted and then weakened. -/
-def lift {n m : ℕ} (σ : Subst n m) : Subst (n + 1) (m + 1) :=
-  Fin.cons (Term.var 0) (fun i => (σ i).shift)
+def lift {n m : ℕ} (σ : Subst TS n m) : Subst TS (n + 1) (m + 1) :=
+  Fin.cons (Tm.var 0) (fun i => (σ i).shift)
 
 /-- The weakening substitution `i ↦ i + 1` (used for the eigenvariable condition). -/
-def weaken (n : ℕ) : Subst n (n + 1) := fun i => Term.var i.succ
+def weaken (n : ℕ) : Subst TS n (n + 1) := fun i => Tm.var i.succ
 
 /-- `[t/0]`: substitute `t` for the variable `0` and lower the other variables. -/
-def single {n : ℕ} (t : Term n) : Subst (n + 1) n := Fin.cons t Term.var
+def single {n : ℕ} (t : Tm TS n) : Subst TS (n + 1) n := Fin.cons t Tm.var
 
-@[simp] theorem lift_zero {n m : ℕ} (σ : Subst n m) : lift σ 0 = Term.var 0 := rfl
+@[simp] theorem lift_zero {n m : ℕ} (σ : Subst TS n m) : lift σ 0 = Tm.var 0 := rfl
 
-@[simp] theorem lift_succ {n m : ℕ} (σ : Subst n m) (i : Fin n) :
+@[simp] theorem lift_succ {n m : ℕ} (σ : Subst TS n m) (i : Fin n) :
     lift σ i.succ = (σ i).shift := rfl
 
-@[simp] theorem single_zero {n : ℕ} (t : Term n) : single t 0 = t := rfl
+@[simp] theorem single_zero {n : ℕ} (t : Tm TS n) : single t 0 = t := rfl
 
-@[simp] theorem single_succ {n : ℕ} (t : Term n) (i : Fin n) : single t i.succ = Term.var i :=
+@[simp] theorem single_succ {n : ℕ} (t : Tm TS n) (i : Fin n) : single t i.succ = Tm.var i :=
   rfl
 
-@[simp] theorem weaken_apply {n : ℕ} (i : Fin n) : weaken n i = Term.var i.succ := rfl
+@[simp] theorem weaken_apply {n : ℕ} (i : Fin n) : weaken (TS := TS) n i = Tm.var i.succ := rfl
 
-@[simp] theorem lift_id {n : ℕ} : lift (Term.var : Subst n n) = Term.var := by
+@[simp] theorem lift_id {n : ℕ} : lift (Tm.var : Subst TS n n) = Tm.var := by
   funext i; refine Fin.cases rfl (fun j => rfl) i
 
 /-- Lifting commutes with composition of substitutions. -/
-theorem lift_comp {n m k : ℕ} (σ : Subst n m) (τ : Subst m k) :
+theorem lift_comp {n m k : ℕ} (σ : Subst TS n m) (τ : Subst TS m k) :
     (fun i => (lift σ i).subst (lift τ)) = lift (fun i => (σ i).subst τ) := by
   funext i
   refine Fin.cases rfl (fun j => ?_) i
-  simp only [lift_succ, Term.shift]
-  rw [Term.subst_rename, Term.rename_subst]; rfl
+  simp only [lift_succ, Tm.shift]
+  rw [Tm.subst_rename, Tm.rename_subst]; rfl
 
 end Subst
 
-/-- A predicate symbol: a name, an arity and a polarity
-("atomic predicates are given with their polarity", §6). -/
-structure Pred where
-  name : ℕ
-  arity : ℕ
-  pol : Pol
-  deriving DecidableEq
-
 /-- The formulas of LU (§6) whose free variables are among `Fin n`.
 Quantifiers bind the variable `0` of a body in scope `n + 1`;
-an atom `p t₁ … tₖ` has exactly `k = p.arity` arguments. -/
-inductive Formula : ℕ → Type where
-  /-- atomic formula `p t₁ … tₖ`, with `k = p.arity` -/
-  | atom {n : ℕ} (p : Pred) (ts : Fin p.arity → Term n) : Formula n
+an atom `p(t₁, …, tₖ)` has a tuple of exactly `k = PS.arity p` arguments. -/
+inductive Formula (PS : PredSig) (TS : TermSig) : ℕ → Type where
+  /-- atomic formula `p(t₁, …, tₖ)`, with `k = PS.arity p` -/
+  | atom {n : ℕ} (p : PS.Pred) (ts : Tms TS n (PS.arity p)) : Formula PS TS n
   /-- the constant `1` (also denoted `V`) -/
-  | one {n : ℕ} : Formula n
+  | one {n : ℕ} : Formula PS TS n
   /-- the constant `0` (also denoted `F`) -/
-  | zero {n : ℕ} : Formula n
+  | zero {n : ℕ} : Formula PS TS n
   /-- the constant `⊥` -/
-  | bot {n : ℕ} : Formula n
+  | bot {n : ℕ} : Formula PS TS n
   /-- the constant `⊤` -/
-  | top {n : ℕ} : Formula n
+  | top {n : ℕ} : Formula PS TS n
   /-- linear negation `A⊥` (also denoted `¬A`) -/
-  | neg {n : ℕ} : Formula n → Formula n
+  | neg {n : ℕ} : Formula PS TS n → Formula PS TS n
   /-- `!A` -/
-  | bang {n : ℕ} : Formula n → Formula n
+  | bang {n : ℕ} : Formula PS TS n → Formula PS TS n
   /-- `?A` -/
-  | quest {n : ℕ} : Formula n → Formula n
+  | quest {n : ℕ} : Formula PS TS n → Formula PS TS n
   /-- `A ⊗ B` -/
-  | tensor {n : ℕ} : Formula n → Formula n → Formula n
+  | tensor {n : ℕ} : Formula PS TS n → Formula PS TS n → Formula PS TS n
   /-- `A ⅋ B` -/
-  | par {n : ℕ} : Formula n → Formula n → Formula n
+  | par {n : ℕ} : Formula PS TS n → Formula PS TS n → Formula PS TS n
   /-- `A ⊸ B` -/
-  | lolli {n : ℕ} : Formula n → Formula n → Formula n
+  | lolli {n : ℕ} : Formula PS TS n → Formula PS TS n → Formula PS TS n
   /-- `A & B` -/
-  | with_ {n : ℕ} : Formula n → Formula n → Formula n
+  | with_ {n : ℕ} : Formula PS TS n → Formula PS TS n → Formula PS TS n
   /-- `A ⊕ B` -/
-  | plus {n : ℕ} : Formula n → Formula n → Formula n
+  | plus {n : ℕ} : Formula PS TS n → Formula PS TS n → Formula PS TS n
   /-- conjunction `A ∧ B` (classical and intuitionistic) -/
-  | conj {n : ℕ} : Formula n → Formula n → Formula n
+  | conj {n : ℕ} : Formula PS TS n → Formula PS TS n → Formula PS TS n
   /-- disjunction `A ∨ B` (classical and intuitionistic) -/
-  | disj {n : ℕ} : Formula n → Formula n → Formula n
+  | disj {n : ℕ} : Formula PS TS n → Formula PS TS n → Formula PS TS n
   /-- classical implication `A ⇒ B` -/
-  | imp {n : ℕ} : Formula n → Formula n → Formula n
+  | imp {n : ℕ} : Formula PS TS n → Formula PS TS n → Formula PS TS n
   /-- intuitionistic implication `A ⊃ B` -/
-  | iimp {n : ℕ} : Formula n → Formula n → Formula n
+  | iimp {n : ℕ} : Formula PS TS n → Formula PS TS n → Formula PS TS n
   /-- linear universal quantifier `⋀x A` (the body binds the variable `0`) -/
-  | lall {n : ℕ} : Formula (n + 1) → Formula n
+  | lall {n : ℕ} : Formula PS TS (n + 1) → Formula PS TS n
   /-- linear existential quantifier `⋁x A` -/
-  | lex {n : ℕ} : Formula (n + 1) → Formula n
+  | lex {n : ℕ} : Formula PS TS (n + 1) → Formula PS TS n
   /-- classical universal quantifier `∀x A` -/
-  | call {n : ℕ} : Formula (n + 1) → Formula n
+  | call {n : ℕ} : Formula PS TS (n + 1) → Formula PS TS n
   /-- existential quantifier `∃x A` (classical and intuitionistic) -/
-  | cex {n : ℕ} : Formula (n + 1) → Formula n
+  | cex {n : ℕ} : Formula PS TS (n + 1) → Formula PS TS n
 
-deriving instance DecidableEq for Formula
+variable {PS : PredSig}
 
 /-- Closed formulas (no free variable). -/
-abbrev ClosedFormula := Formula 0
+abbrev ClosedFormula (PS : PredSig) (TS : TermSig) := Formula PS TS 0
 
 namespace Formula
 
-instance {n : ℕ} : Inhabited (Formula n) := ⟨one⟩
+section DecEq
+
+variable [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
+set_option maxHeartbeats 1000000 in
+/-- Decidable equality of formulas, given decidable equality of the function and predicate
+symbols. -/
+def decEq : {n : ℕ} → (A B : Formula PS TS n) → Decidable (A = B)
+  | _, A, B => by
+    cases A <;> cases B
+    case atom.atom p ts q us =>
+      exact if h : p = q then by subst h; exact decidable_of_iff (ts = us) (by simp)
+        else isFalse (by intro e; cases e; exact h rfl)
+    all_goals first
+      | (apply isFalse; intro e; cases e; done)
+      | (apply isTrue; rfl)
+      | (rename_i A A' B B'
+         haveI := decEq A B; haveI := decEq A' B'
+         refine decidable_of_iff (A = B ∧ A' = B') ⟨?_, ?_⟩
+         · rintro ⟨rfl, rfl⟩; rfl
+         · intro e; cases e; exact ⟨rfl, rfl⟩)
+      | (rename_i A B
+         haveI := decEq A B
+         refine decidable_of_iff (A = B) ⟨?_, ?_⟩
+         · rintro rfl; rfl
+         · intro e; cases e; rfl)
+
+instance {n : ℕ} : DecidableEq (Formula PS TS n) := decEq
+
+end DecEq
+
+instance {n : ℕ} : Inhabited (Formula PS TS n) := ⟨one⟩
 
 /-- Simultaneous substitution of terms for the free variables of a formula
 (capture-avoiding by construction: the substitution is lifted under binders). -/
-def subst {n m : ℕ} : Formula n → Subst n m → Formula m
-  | atom p ts, σ => atom p (fun i => (ts i).subst σ)
+def subst {n m : ℕ} : Formula PS TS n → Subst TS n m → Formula PS TS m
+  | atom p ts, σ => atom p (ts.subst σ)
   | one, _ => one
   | zero, _ => zero
   | bot, _ => bot
@@ -376,42 +539,44 @@ def subst {n m : ℕ} : Formula n → Subst n m → Formula m
 
 /-- Weakening: a formula of scope `n` seen in scope `n + 1` (used for the eigenvariable
 condition: a formula of the context cannot mention the fresh variable `0`). -/
-def shift {n : ℕ} (A : Formula n) : Formula (n + 1) := A.subst (Subst.weaken n)
+def shift {n : ℕ} (A : Formula PS TS n) : Formula PS TS (n + 1) := A.subst (Subst.weaken n)
 
 /-- `A[t/x]`: instantiate the bound variable (index `0`) of a quantifier body. -/
-def inst {n : ℕ} (A : Formula (n + 1)) (t : Term n) : Formula n := A.subst (Subst.single t)
+def inst {n : ℕ} (A : Formula PS TS (n + 1)) (t : Tm TS n) : Formula PS TS n :=
+  A.subst (Subst.single t)
 
-theorem subst_subst {n m k : ℕ} (A : Formula n) (σ : Subst n m) (τ : Subst m k) :
+theorem subst_subst {n m k : ℕ} (A : Formula PS TS n) (σ : Subst TS n m) (τ : Subst TS m k) :
     (A.subst σ).subst τ = A.subst (fun i => (σ i).subst τ) := by
   induction A generalizing m k with
-  | atom p ts => simp only [subst, Term.subst_subst]
+  | atom p ts => simp only [subst, Tms.subst_subst]
   | lall A ih => simp only [subst, ih, Subst.lift_comp]
   | lex A ih => simp only [subst, ih, Subst.lift_comp]
   | call A ih => simp only [subst, ih, Subst.lift_comp]
   | cex A ih => simp only [subst, ih, Subst.lift_comp]
   | _ => simp_all [subst]
 
-@[simp] theorem subst_id {n : ℕ} (A : Formula n) : A.subst Term.var = A := by
+@[simp] theorem subst_id {n : ℕ} (A : Formula PS TS n) : A.subst Tm.var = A := by
   induction A with
   | atom p ts => simp [subst]
   | _ => simp_all [subst]
 
-theorem subst_congr {n m : ℕ} (A : Formula n) {σ τ : Subst n m} (h : ∀ i, σ i = τ i) :
+theorem subst_congr {n m : ℕ} (A : Formula PS TS n) {σ τ : Subst TS n m}
+    (h : ∀ i, σ i = τ i) :
     A.subst σ = A.subst τ := by
   rw [funext h]
 
 /-- Weakening commutes with substitution. -/
-theorem shift_subst {n m : ℕ} (A : Formula n) (σ : Subst n m) :
+theorem shift_subst {n m : ℕ} (A : Formula PS TS n) (σ : Subst TS n m) :
     (A.subst σ).shift = A.shift.subst (Subst.lift σ) := by
   simp only [shift, subst_subst]
   apply subst_congr
   intro i
-  simp only [Subst.weaken_apply, Term.subst_var, Subst.lift_succ, Term.shift,
-    Term.rename_eq_subst]
+  simp only [Subst.weaken_apply, Tm.subst_var, Subst.lift_succ, Tm.shift,
+    Tm.rename_eq_subst]
   rfl
 
 /-- Instantiation commutes with substitution. -/
-theorem inst_subst {n m : ℕ} (A : Formula (n + 1)) (t : Term n) (σ : Subst n m) :
+theorem inst_subst {n m : ℕ} (A : Formula PS TS (n + 1)) (t : Tm TS n) (σ : Subst TS n m) :
     (A.inst t).subst σ = (A.subst (Subst.lift σ)).inst (t.subst σ) := by
   simp only [inst, subst_subst]
   apply subst_congr
@@ -420,21 +585,70 @@ theorem inst_subst {n m : ℕ} (A : Formula (n + 1)) (t : Term n) (σ : Subst n 
   simp [Subst.single, Subst.lift]
 
 /-- Instantiating a weakened formula does nothing. -/
-@[simp] theorem shift_inst {n : ℕ} (A : Formula n) (t : Term n) : A.shift.inst t = A := by
+@[simp] theorem shift_inst {n : ℕ} (A : Formula PS TS n) (t : Tm TS n) : A.shift.inst t = A := by
   simp only [shift, inst, subst_subst]
   exact subst_id A
 
 /-- Instantiating with the fresh variable `0` a body lifted under a binder gives it back. -/
-@[simp] theorem subst_lift_weaken_inst {n : ℕ} (A : Formula (n + 1)) :
-    (A.subst (Subst.lift (Subst.weaken n))).inst (Term.var 0) = A := by
+@[simp] theorem subst_lift_weaken_inst {n : ℕ} (A : Formula PS TS (n + 1)) :
+    (A.subst (Subst.lift (Subst.weaken n))).inst (Tm.var 0) = A := by
   simp only [inst, subst_subst]
   convert subst_id A using 2
   funext i
   refine Fin.cases rfl (fun j => rfl) i
 
+/-- The lifting of a renaming is a renaming. -/
+theorem _root_.LU.Subst.lift_ren {n m : ℕ} (ρ : Fin n → Fin m) :
+    Subst.lift (fun i => Tm.var (ρ i) : Subst TS n m) =
+      fun i => Tm.var ((Fin.cases 0 (fun j => (ρ j).succ) : Fin (n + 1) → Fin (m + 1)) i) := by
+  funext i; refine Fin.cases rfl (fun j => rfl) i
+
+theorem _root_.LU.Subst.liftRen_injective {n m : ℕ} {ρ : Fin n → Fin m}
+    (hρ : Function.Injective ρ) :
+    Function.Injective (Fin.cases 0 (fun j => (ρ j).succ) : Fin (n + 1) → Fin (m + 1)) := by
+  intro i j hij
+  refine Fin.cases (Fin.cases (fun _ => rfl) (fun j h => ?_) j)
+    (fun i => Fin.cases (fun h => ?_) (fun j h => ?_) j) i hij
+  · exact absurd h.symm (Fin.succ_ne_zero _)
+  · exact absurd h (Fin.succ_ne_zero _)
+  · simp only [Fin.cases_succ, Fin.succ_inj] at h; rw [hρ h]
+
+/-- Substitution along an injective renaming of variables is injective. -/
+theorem subst_ren_injective {n m : ℕ} {ρ : Fin n → Fin m} (hρ : Function.Injective ρ)
+    {A B : Formula PS TS n}
+    (h : A.subst (fun i => Tm.var (ρ i)) = B.subst (fun i => Tm.var (ρ i))) : A = B := by
+  induction A generalizing m with
+  | atom p ts =>
+    cases B with
+    | atom q us =>
+      simp only [subst, atom.injEq] at h
+      obtain ⟨rfl, h⟩ := h
+      rw [← Tms.rename_eq_subst, ← Tms.rename_eq_subst] at h
+      rw [Tms.rename_injective hρ ts us (eq_of_heq h)]
+    | _ => simp [subst] at h
+  | lall A ih | lex A ih | call A ih | cex A ih =>
+    cases B <;> simp only [subst, reduceCtorEq, lall.injEq, lex.injEq, call.injEq, cex.injEq,
+      Subst.lift_ren] at h
+    all_goals rw [ih (Subst.liftRen_injective hρ) h]
+  | neg A ih | bang A ih | quest A ih =>
+    cases B <;> simp only [subst, reduceCtorEq, neg.injEq, bang.injEq, quest.injEq] at h ⊢
+    all_goals exact ih hρ h
+  | tensor A A' ih ih' | par A A' ih ih' | lolli A A' ih ih' | with_ A A' ih ih'
+  | plus A A' ih ih' | conj A A' ih ih' | disj A A' ih ih' | imp A A' ih ih'
+  | iimp A A' ih ih' =>
+    cases B <;> simp only [subst, reduceCtorEq, tensor.injEq, par.injEq, lolli.injEq, with_.injEq,
+      plus.injEq, conj.injEq, disj.injEq, imp.injEq, iimp.injEq] at h ⊢
+    all_goals exact ⟨ih hρ h.1, ih' hρ h.2⟩
+  | one | zero | bot | top => cases B <;> simp only [subst, reduceCtorEq] at h ⊢
+
+/-- Weakening is injective. -/
+theorem shift_injective {n : ℕ} :
+    Function.Injective (Formula.shift : Formula PS TS n → Formula PS TS (n + 1)) :=
+  fun _ _ h => subst_ren_injective (Fin.succ_injective n) h
+
 /-- The polarity of a formula (§2, Tables 1 and 2). -/
-def pol {n : ℕ} : Formula n → Pol
-  | atom p _ => p.pol
+def pol {n : ℕ} : Formula PS TS n → Pol
+  | atom p _ => PS.predPol p
   | one => .pos
   | zero => .pos
   | bot => .neg
@@ -456,13 +670,14 @@ def pol {n : ℕ} : Formula n → Pol
   | call _ => .neg
   | cex _ => .pos
 
-@[simp] theorem pol_subst {n m : ℕ} (A : Formula n) (σ : Subst n m) :
+@[simp] theorem pol_subst {n m : ℕ} (A : Formula PS TS n) (σ : Subst TS n m) :
     (A.subst σ).pol = A.pol := by
   induction A generalizing m <;> simp_all [subst, pol]
 
-@[simp] theorem pol_shift {n : ℕ} (A : Formula n) : A.shift.pol = A.pol := pol_subst A _
+@[simp] theorem pol_shift {n : ℕ} (A : Formula PS TS n) : A.shift.pol = A.pol := pol_subst A _
 
-@[simp] theorem pol_inst {n : ℕ} (A : Formula (n + 1)) (t : Term n) : (A.inst t).pol = A.pol :=
+@[simp] theorem pol_inst {n : ℕ} (A : Formula PS TS (n + 1)) (t : Tm TS n) :
+    (A.inst t).pol = A.pol :=
   pol_subst A _
 
 end Formula

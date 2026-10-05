@@ -21,11 +21,13 @@ which is replaced by the "good" one `Γ;Γ' ⊢ ;P   B,Λ;Γ' ⊢ ;C  /  P⊃B,�
 
 namespace LU
 
+variable {PS : PredSig} {TS : TermSig} [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
 variable {n : ℕ}
 
 open Formula
 
-theorem good_zeroL (Γ Δ : Multiset (Formula n)) (hc : IntShape ⟪zero ::ₘ Γ ; ∅ ⊢ ∅ ; Δ⟫) :
+theorem good_zeroL (Γ Δ : Multiset (Formula PS TS n)) (hc : IntShape ⟪zero ::ₘ Γ ; ∅ ⊢ ∅ ; Δ⟫) :
     IntGood ⟪zero ::ₘ Γ ; ∅ ⊢ ∅ ; Δ⟫ := by
   refine ⟨fun h1 => within_rule (Rule.zeroL Γ Δ) rfl ⟨hc.1, hc.2, h1⟩ (by simp),
     fun _ TL TC TR hT hL _ _ => ?_⟩
@@ -37,20 +39,26 @@ theorem good_zeroL (Γ Δ : Multiset (Formula n)) (hc : IntShape ⟪zero ::ₘ �
   have hw := within_rule (Rule.zeroL X TR) (by rw [hX]) hs (by simp)
   exact within_weakCL' hw hT (Finset.empty_subset _)
 
-theorem good_weakL {Γ : Multiset (Formula n)} {Γ' : Finset (Formula n)} {Δ : Multiset (Formula n)} {A : Formula n}
+theorem good_weakL {Γ : Multiset (Formula PS TS n)} {Γ' : Finset (Formula PS TS n)} {Δ : Multiset (Formula PS TS n)} {A : Formula PS TS n}
     (hc : IntShape ⟪Γ ; insert A Γ' ⊢ ∅ ; Δ⟫) (ih : IntGood ⟪Γ ; Γ' ⊢ ∅ ; Δ⟫) :
     IntGood ⟪Γ ; insert A Γ' ⊢ ∅ ; Δ⟫ :=
   ⟨fun h1 => within_rule (Rule.weakL Γ Γ' ∅ Δ A) rfl ⟨hc.1, hc.2, h1⟩ (by simpa using ih.1 h1),
     fun h1 _ _ _ hT hL hC hR => ih.absorb h1 hT hL ((Finset.subset_insert _ _).trans hC) hR⟩
 
-theorem NR_add (Δ Θ : Multiset (Formula n)) : NR (Δ + Θ) = NR Δ + NR Θ :=
+section
+
+omit [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
+theorem NR_add (Δ Θ : Multiset (Formula PS TS n)) : NR (Δ + Θ) = NR Δ + NR Θ :=
   Multiset.filter_add _ _ _
 
-theorem card_cons_ne_one {A : Formula n} {Δ : Multiset (Formula n)} :
+theorem card_cons_ne_one {A : Formula PS TS n} {Δ : Multiset (Formula PS TS n)} :
     Multiset.card (A ::ₘ Δ) ≠ 1 ↔ Δ ≠ 0 := by
   simp [Multiset.card_eq_zero]
 
-theorem good_conjR_PQ {Γ Λ : Multiset (Formula n)} {Γ' : Finset (Formula n)} {Δ Θ : Multiset (Formula n)} {P Q : Formula n} (hP : P.pol = .pos)
+end
+
+theorem good_conjR_PQ {Γ Λ : Multiset (Formula PS TS n)} {Γ' : Finset (Formula PS TS n)} {Δ Θ : Multiset (Formula PS TS n)} {P Q : Formula PS TS n} (hP : P.pol = .pos)
     (hQ : Q.pol = .pos) (hc : IntShape ⟪Γ + Λ ; Γ' ⊢ ∅ ; conj P Q ::ₘ (Δ + Θ)⟫)
     (ih1 : IntGood ⟪Γ ; Γ' ⊢ ∅ ; P ::ₘ Δ⟫) (ih2 : IntGood ⟪Λ ; Γ' ⊢ ∅ ; Q ::ₘ Θ⟫) :
     IntGood ⟪Γ + Λ ; Γ' ⊢ ∅ ; conj P Q ::ₘ (Δ + Θ)⟫ := by
@@ -72,7 +80,7 @@ theorem good_conjR_PQ {Γ Λ : Multiset (Formula n)} {Γ' : Finset (Formula n)} 
     · refine ih1.absorb (card_cons_ne_one.2 hΔ) hT ((Multiset.le_add_right _ _).trans hL) hC ?_
       rw [NR_cons_of_rem (nrem_of_pos hP)]; exact (Multiset.le_add_right _ _).trans hR
 
-theorem good_conjR_AQ {Λ : Multiset (Formula n)} {Γ' : Finset (Formula n)} {Θ : Multiset (Formula n)} {A Q : Formula n} (hA : A.pol ≠ .pos)
+theorem good_conjR_AQ {Λ : Multiset (Formula PS TS n)} {Γ' : Finset (Formula PS TS n)} {Θ : Multiset (Formula PS TS n)} {A Q : Formula PS TS n} (hA : A.pol ≠ .pos)
     (hQ : Q.pol = .pos) (hc : IntShape ⟪Λ ; Γ' ⊢ ∅ ; conj A Q ::ₘ Θ⟫)
     (ih1 : IntGood ⟪0 ; Γ' ⊢ ∅ ; {A}⟫) (ih2 : IntGood ⟪Λ ; Γ' ⊢ ∅ ; Q ::ₘ Θ⟫) :
     IntGood ⟪Λ ; Γ' ⊢ ∅ ; conj A Q ::ₘ Θ⟫ := by
@@ -83,7 +91,7 @@ theorem good_conjR_AQ {Λ : Multiset (Formula n)} {Γ' : Finset (Formula n)} {Θ
     fun h1 TL TC TR hT hL hC hR => ih2.absorb (by simpa using h1) hT hL hC ?_⟩
   rw [NR_cons_of_rem (nrem_of_pos hQ)]; rwa [NR_cons_of_rem hAQ] at hR
 
-theorem good_conjR_PB {Γ : Multiset (Formula n)} {Γ' : Finset (Formula n)} {Δ : Multiset (Formula n)} {P B : Formula n} (hP : P.pol = .pos)
+theorem good_conjR_PB {Γ : Multiset (Formula PS TS n)} {Γ' : Finset (Formula PS TS n)} {Δ : Multiset (Formula PS TS n)} {P B : Formula PS TS n} (hP : P.pol = .pos)
     (hB : B.pol ≠ .pos) (hc : IntShape ⟪Γ ; Γ' ⊢ ∅ ; conj P B ::ₘ Δ⟫)
     (ih1 : IntGood ⟪Γ ; Γ' ⊢ ∅ ; P ::ₘ Δ⟫) (ih2 : IntGood ⟪0 ; Γ' ⊢ ∅ ; {B}⟫) :
     IntGood ⟪Γ ; Γ' ⊢ ∅ ; conj P B ::ₘ Δ⟫ := by
@@ -94,7 +102,7 @@ theorem good_conjR_PB {Γ : Multiset (Formula n)} {Γ' : Finset (Formula n)} {Δ
     fun h1 TL TC TR hT hL hC hR => ih1.absorb (by simpa using h1) hT hL hC ?_⟩
   rw [NR_cons_of_rem (nrem_of_pos hP)]; rwa [NR_cons_of_rem hPB] at hR
 
-theorem good_conjR_AB {Γ : Multiset (Formula n)} {Γ' : Finset (Formula n)} {Δ : Multiset (Formula n)} {A B : Formula n} (hA : A.pol ≠ .pos)
+theorem good_conjR_AB {Γ : Multiset (Formula PS TS n)} {Γ' : Finset (Formula PS TS n)} {Δ : Multiset (Formula PS TS n)} {A B : Formula PS TS n} (hA : A.pol ≠ .pos)
     (hB : B.pol ≠ .pos) (hn : (conj A B).nrem = true)
     (hc : IntShape ⟪Γ ; Γ' ⊢ ∅ ; conj A B ::ₘ Δ⟫)
     (hp1 : IntShape ⟪Γ ; Γ' ⊢ ∅ ; A ::ₘ Δ⟫) (hp2 : IntShape ⟪Γ ; Γ' ⊢ ∅ ; B ::ₘ Δ⟫)
@@ -120,7 +128,7 @@ theorem good_conjR_AB {Γ : Multiset (Formula n)} {Γ' : Finset (Formula n)} {Δ
   · simpa using ih2.2 (by simpa using h1) _ _ _ (intSeq_mk hL' hC' hpB.2.2.2.1) (by simp)
       (by simp) (by simpa [h0] using NR_cons_le B Δ)
 
-theorem good_iimpL_P {Γ Λ : Multiset (Formula n)} {Γ' : Finset (Formula n)} {Δ Θ : Multiset (Formula n)} {P B : Formula n} (hP : P.pol = .pos)
+theorem good_iimpL_P {Γ Λ : Multiset (Formula PS TS n)} {Γ' : Finset (Formula PS TS n)} {Δ Θ : Multiset (Formula PS TS n)} {P B : Formula PS TS n} (hP : P.pol = .pos)
     (hc : IntShape ⟪iimp P B ::ₘ (Γ + Λ) ; Γ' ⊢ ∅ ; Δ + Θ⟫)
     (hp2 : IntShape ⟪B ::ₘ Λ ; Γ' ⊢ ∅ ; Θ⟫)
     (ih1 : IntGood ⟪Γ ; Γ' ⊢ ∅ ; P ::ₘ Δ⟫) (ih2 : IntGood ⟪B ::ₘ Λ ; Γ' ⊢ ∅ ; Θ⟫) :
@@ -157,7 +165,7 @@ theorem good_iimpL_P {Γ Λ : Multiset (Formula n)} {Γ' : Finset (Formula n)} {
       refine le_trans ?_ hR
       simp
 
-theorem good_iimpL_A {Λ : Multiset (Formula n)} {Γ' : Finset (Formula n)} {Θ : Multiset (Formula n)} {A B : Formula n} (hA : A.pol ≠ .pos)
+theorem good_iimpL_A {Λ : Multiset (Formula PS TS n)} {Γ' : Finset (Formula PS TS n)} {Θ : Multiset (Formula PS TS n)} {A B : Formula PS TS n} (hA : A.pol ≠ .pos)
     (hc : IntShape ⟪iimp A B ::ₘ Λ ; Γ' ⊢ ∅ ; Θ⟫)
     (hp2 : IntShape ⟪B ::ₘ Λ ; Γ' ⊢ ∅ ; Θ⟫)
     (ih1 : IntGood ⟪0 ; Γ' ⊢ ∅ ; {A}⟫) (ih2 : IntGood ⟪B ::ₘ Λ ; Γ' ⊢ ∅ ; Θ⟫) :
@@ -175,7 +183,7 @@ theorem good_iimpL_A {Λ : Multiset (Formula n)} {Γ' : Finset (Formula n)} {Θ 
     exact ⟨hpA.1.1, hpA.1.2, hE⟩
   · simp only [Finset.mem_union, or_imp, forall_and]; exact ⟨hpA.2.1, hE'⟩
 
-theorem good_lallR {Γ : Multiset (Formula n)} {Γ' : Finset (Formula n)} {Δ : Multiset (Formula n)} {A : Formula (n + 1)} (hn : (lall A).nrem = true)
+theorem good_lallR {Γ : Multiset (Formula PS TS n)} {Γ' : Finset (Formula PS TS n)} {Δ : Multiset (Formula PS TS n)} {A : Formula PS TS (n + 1)} (hn : (lall A).nrem = true)
     (hc : IntShape ⟪Γ ; Γ' ⊢ ∅ ; lall A ::ₘ Δ⟫)
     (hp : IntShape ⟪sh Γ ; shc Γ' ⊢ ∅ ; A ::ₘ sh Δ⟫)
     (ih : IntGood ⟪sh Γ ; shc Γ' ⊢ ∅ ; A ::ₘ sh Δ⟫) :
@@ -204,32 +212,38 @@ theorem good_lallR {Γ : Multiset (Formula n)} {Γ' : Finset (Formula n)} {Δ : 
     · simp only [Finset.image_union, Finset.mem_union, or_imp, forall_and]
       exact ⟨hpA.2.1, forall_mem_shc subClosed_intuitionistic hE'⟩
 
-theorem nrem_iimp {A B : Formula n} (h : B.pol ≠ .neg) : (iimp A B).nrem = true := by
+section
+
+omit [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
+theorem nrem_iimp {A B : Formula PS TS n} (h : B.pol ≠ .neg) : (iimp A B).nrem = true := by
   simp only [nrem, isAtom, Bool.not_false, Bool.and_true, decide_eq_true_eq, pol]
   revert h; generalize A.pol = a; generalize B.pol = b; cases a <;> cases b <;> simp [Pol.iimp]
 
-theorem nrem_lall {A : Formula (n + 1)} (h : A.pol ≠ .neg) : (lall A).nrem = true := by
+theorem nrem_lall {A : Formula PS TS (n + 1)} (h : A.pol ≠ .neg) : (lall A).nrem = true := by
   simp only [nrem, isAtom, Bool.not_false, Bool.and_true, decide_eq_true_eq, pol]
   revert h; generalize A.pol = a; cases a <;> simp [Pol.lall]
 
-theorem nrem_conj {A B : Formula n} (hA : A.pol = .neu) (hB : B.pol = .neu) :
+theorem nrem_conj {A B : Formula PS TS n} (hA : A.pol = .neu) (hB : B.pol = .neu) :
     (conj A B).nrem = true := by
   simp [nrem, pol, isAtom, hA, hB, Pol.conj]
 
-theorem pol_eq_neu {A : Formula n} (h1 : A.pol ≠ .pos) (h2 : A.pol ≠ .neg) : A.pol = .neu := by
+theorem pol_eq_neu {A : Formula PS TS n} (h1 : A.pol ≠ .pos) (h2 : A.pol ≠ .neg) : A.pol = .neu := by
   revert h1 h2; cases A.pol <;> simp
 
 /-- The principal formula on the right of an intuitionistic-shaped sequent is intuitionistic. -/
-theorem IntShape.right_head {Γ : Multiset (Formula n)} {Γ' Δ' : Finset (Formula n)} {Δ : Multiset (Formula n)} {C : Formula n}
+theorem IntShape.right_head {Γ : Multiset (Formula PS TS n)} {Γ' Δ' : Finset (Formula PS TS n)} {Δ : Multiset (Formula PS TS n)} {C : Formula PS TS n}
     (h : IntShape ⟪Γ ; Γ' ⊢ Δ' ; C ::ₘ Δ⟫) : C.IsIntuitionistic :=
   (allIn_mk.1 h.1).2.2.2 _ (Multiset.mem_cons_self _ _)
 
+end
+
 set_option maxHeartbeats 4000000 in
 /-- Rule-by-rule analysis for the intuitionistic fragment. -/
-theorem Rule.intGood {ps : List (Premise n)} {c : Sequent n} (hr : Rule ps c) (hc : IntShape c)
+theorem Rule.intGood {ps : List (Premise PS TS n)} {c : Sequent PS TS n} (hr : Rule ps c) (hc : IntShape c)
     (hpre : ∀ p ∈ ps, p.All IntShape) (ih : ∀ p ∈ ps, p.All IntGood) : IntGood c := by
   have hr' := hr
-  have hneg : ∀ {n : ℕ} (A : Formula n), A.IsIntuitionistic → A.pol ≠ .neg := fun A h => h.pol_ne_neg
+  have hneg : ∀ {n : ℕ} (A : Formula PS TS n), A.IsIntuitionistic → A.pol ≠ .neg := fun A h => h.pol_ne_neg
   cases hr
   case ax A => exact good_card1 hr' hc (by simp) (by simp) ih
   case oneR => exact good_card1 hr' hc (by simp) (by simp) ih
@@ -421,9 +435,9 @@ theorem Rule.intGood {ps : List (Premise n)} {c : Sequent n} (hr : Rule ps c) (h
 set_option maxHeartbeats 4000000 in
 /-- In a cut-free rule whose conclusion has an empty right central zone and whose formulas
 are intuitionistic, the premises also have an empty right central zone. -/
-theorem Rule.int_CR {ps : List (Premise n)} {c : Sequent n} (hr : Rule ps c) (hc : IntShape c)
+theorem Rule.int_CR {ps : List (Premise PS TS n)} {c : Sequent PS TS n} (hr : Rule ps c) (hc : IntShape c)
     (hp : ∀ p ∈ ps, p.All (AllIn IsIntuitionistic)) : ∀ p ∈ ps, p.All (fun s => s.CR = ∅) := by
-  have hneg : ∀ {n : ℕ} (A : Formula n), A.IsIntuitionistic → A.pol ≠ .neg := fun A h => h.pol_ne_neg
+  have hneg : ∀ {n : ℕ} (A : Formula PS TS n), A.IsIntuitionistic → A.pol ≠ .neg := fun A h => h.pol_ne_neg
   cases hr <;>
     simp only [IntShape, allIn_mk, Premise.all_same, Premise.all_up, List.mem_cons,
       List.not_mem_nil, or_false,
@@ -433,7 +447,7 @@ theorem Rule.int_CR {ps : List (Premise n)} {c : Sequent n} (hr : Rule ps c) (hc
 
 /-- Main lemma: every cut-free provable intuitionistic-shaped sequent satisfies the
 invariant `IntGood`. -/
-theorem int_main {S : Sequent n} (h : CutFreeProvable S) (hS : IntShape S) : IntGood S := by
+theorem int_main {S : Sequent PS TS n} (h : CutFreeProvable S) (hS : IntShape S) : IntGood S := by
   unfold CutFreeProvable at h
   induction h with
   | mk ps c hr _ _ _ ihs ihu =>
@@ -445,7 +459,7 @@ theorem int_main {S : Sequent n} (h : CutFreeProvable S) (hS : IntShape S) : Int
 
 /-- **Theorem (§6), intuitionistic fragment, cut-free version.**  A cut-free provable
 intuitionistic sequent `Γ;Γ' ⊢ ;A` is provable within the intuitionistic fragment. -/
-theorem intuitionistic_within {S : Sequent n} (h : CutFreeProvable S) (hS : IntSeq S) :
+theorem intuitionistic_within {S : Sequent PS TS n} (h : CutFreeProvable S) (hS : IntSeq S) :
     ProvableWithin .intuitionistic S :=
   (int_main h ⟨hS.1, hS.2.1⟩).1 hS.2.2
 

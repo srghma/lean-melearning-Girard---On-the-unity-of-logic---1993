@@ -25,83 +25,91 @@ classical formulas is a derived rule of Gentzen's LK.  Hence:
 
 namespace LU
 
+variable {PS : PredSig} {TS : TermSig} [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
 variable {n : ℕ}
 
 open Formula
 
 /-- Gentzen's sequent calculus LK (with weakening and contraction, without cut) for the
 connectives of the classical fragment.  `LK Γ Δ` means `Γ ⊢ Δ`. -/
-inductive LK : {n : ℕ} → Multiset (Formula n) → Multiset (Formula n) → Prop where
-  | ax {n : ℕ} (A : Formula n) : LK {A} {A}
-  | weakL {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula n) : LK Γ Δ → LK (A ::ₘ Γ) Δ
-  | weakR {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula n) : LK Γ Δ → LK Γ (A ::ₘ Δ)
-  | contrL {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula n) : LK (A ::ₘ A ::ₘ Γ) Δ → LK (A ::ₘ Γ) Δ
-  | contrR {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula n) : LK Γ (A ::ₘ A ::ₘ Δ) → LK Γ (A ::ₘ Δ)
-  | trueR {n : ℕ} : LK 0 {(one : Formula n)}
-  | falseL {n : ℕ} (Γ Δ : Multiset (Formula n)) : LK (zero ::ₘ Γ) Δ
-  | negL {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula n) : LK Γ (A ::ₘ Δ) → LK (neg A ::ₘ Γ) Δ
-  | negR {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula n) : LK (A ::ₘ Γ) Δ → LK Γ (neg A ::ₘ Δ)
-  | conjR {n : ℕ} (Γ Δ : Multiset (Formula n)) (A B : Formula n) :
+inductive LK : {n : ℕ} → Multiset (Formula PS TS n) → Multiset (Formula PS TS n) → Prop where
+  | ax {n : ℕ} (A : Formula PS TS n) : LK {A} {A}
+  | weakL {n : ℕ} (Γ Δ : Multiset (Formula PS TS n)) (A : Formula PS TS n) : LK Γ Δ → LK (A ::ₘ Γ) Δ
+  | weakR {n : ℕ} (Γ Δ : Multiset (Formula PS TS n)) (A : Formula PS TS n) : LK Γ Δ → LK Γ (A ::ₘ Δ)
+  | contrL {n : ℕ} (Γ Δ : Multiset (Formula PS TS n)) (A : Formula PS TS n) : LK (A ::ₘ A ::ₘ Γ) Δ → LK (A ::ₘ Γ) Δ
+  | contrR {n : ℕ} (Γ Δ : Multiset (Formula PS TS n)) (A : Formula PS TS n) : LK Γ (A ::ₘ A ::ₘ Δ) → LK Γ (A ::ₘ Δ)
+  | trueR {n : ℕ} : LK 0 {(one : Formula PS TS n)}
+  | falseL {n : ℕ} (Γ Δ : Multiset (Formula PS TS n)) : LK (zero ::ₘ Γ) Δ
+  | negL {n : ℕ} (Γ Δ : Multiset (Formula PS TS n)) (A : Formula PS TS n) : LK Γ (A ::ₘ Δ) → LK (neg A ::ₘ Γ) Δ
+  | negR {n : ℕ} (Γ Δ : Multiset (Formula PS TS n)) (A : Formula PS TS n) : LK (A ::ₘ Γ) Δ → LK Γ (neg A ::ₘ Δ)
+  | conjR {n : ℕ} (Γ Δ : Multiset (Formula PS TS n)) (A B : Formula PS TS n) :
       LK Γ (A ::ₘ Δ) → LK Γ (B ::ₘ Δ) → LK Γ (conj A B ::ₘ Δ)
-  | conjL {n : ℕ} (Γ Δ : Multiset (Formula n)) (A B : Formula n) :
+  | conjL {n : ℕ} (Γ Δ : Multiset (Formula PS TS n)) (A B : Formula PS TS n) :
       LK (A ::ₘ B ::ₘ Γ) Δ → LK (conj A B ::ₘ Γ) Δ
-  | disjR {n : ℕ} (Γ Δ : Multiset (Formula n)) (A B : Formula n) :
+  | disjR {n : ℕ} (Γ Δ : Multiset (Formula PS TS n)) (A B : Formula PS TS n) :
       LK Γ (A ::ₘ B ::ₘ Δ) → LK Γ (disj A B ::ₘ Δ)
-  | disjL {n : ℕ} (Γ Δ : Multiset (Formula n)) (A B : Formula n) :
+  | disjL {n : ℕ} (Γ Δ : Multiset (Formula PS TS n)) (A B : Formula PS TS n) :
       LK (A ::ₘ Γ) Δ → LK (B ::ₘ Γ) Δ → LK (disj A B ::ₘ Γ) Δ
-  | impR {n : ℕ} (Γ Δ : Multiset (Formula n)) (A B : Formula n) :
+  | impR {n : ℕ} (Γ Δ : Multiset (Formula PS TS n)) (A B : Formula PS TS n) :
       LK (A ::ₘ Γ) (B ::ₘ Δ) → LK Γ (imp A B ::ₘ Δ)
-  | impL {n : ℕ} (Γ Δ : Multiset (Formula n)) (A B : Formula n) :
+  | impL {n : ℕ} (Γ Δ : Multiset (Formula PS TS n)) (A B : Formula PS TS n) :
       LK Γ (A ::ₘ Δ) → LK (B ::ₘ Γ) Δ → LK (imp A B ::ₘ Γ) Δ
   /-- `∀x`-right, with the eigenvariable condition expressed by weakening the context. -/
-  | allR {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula (n + 1)) :
+  | allR {n : ℕ} (Γ Δ : Multiset (Formula PS TS n)) (A : Formula PS TS (n + 1)) :
       LK (sh Γ) (A ::ₘ sh Δ) → LK Γ (call A ::ₘ Δ)
-  | allL {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula (n + 1)) (t : Term n) :
+  | allL {n : ℕ} (Γ Δ : Multiset (Formula PS TS n)) (A : Formula PS TS (n + 1)) (t : Tm TS n) :
       LK (A.inst t ::ₘ Γ) Δ → LK (call A ::ₘ Γ) Δ
-  | exR {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula (n + 1)) (t : Term n) :
+  | exR {n : ℕ} (Γ Δ : Multiset (Formula PS TS n)) (A : Formula PS TS (n + 1)) (t : Tm TS n) :
       LK Γ (A.inst t ::ₘ Δ) → LK Γ (cex A ::ₘ Δ)
   /-- `∃x`-left, with the eigenvariable condition expressed by weakening the context. -/
-  | exL {n : ℕ} (Γ Δ : Multiset (Formula n)) (A : Formula (n + 1)) :
+  | exL {n : ℕ} (Γ Δ : Multiset (Formula PS TS n)) (A : Formula PS TS (n + 1)) :
       LK (A ::ₘ sh Γ) (sh Δ) → LK (cex A ::ₘ Γ) Δ
 
 namespace LK
 
-theorem congr {Γ Γ' Δ Δ' : Multiset (Formula n)} (h : LK Γ Δ) (e1 : Γ = Γ') (e2 : Δ = Δ') :
+section
+
+omit [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
+theorem congr {Γ Γ' Δ Δ' : Multiset (Formula PS TS n)} (h : LK Γ Δ) (e1 : Γ = Γ') (e2 : Δ = Δ') :
     LK Γ' Δ' := e1 ▸ e2 ▸ h
 
-theorem weakenL {Γ Δ : Multiset (Formula n)} (h : LK Γ Δ) : ∀ E, LK (E + Γ) Δ := by
+theorem weakenL {Γ Δ : Multiset (Formula PS TS n)} (h : LK Γ Δ) : ∀ E, LK (E + Γ) Δ := by
   intro E
   induction E using Multiset.induction_on with
   | empty => simpa using h
   | cons A E ih => rw [Multiset.cons_add]; exact .weakL _ _ A ih
 
-theorem weakenR {Γ Δ : Multiset (Formula n)} (h : LK Γ Δ) : ∀ E, LK Γ (E + Δ) := by
+theorem weakenR {Γ Δ : Multiset (Formula PS TS n)} (h : LK Γ Δ) : ∀ E, LK Γ (E + Δ) := by
   intro E
   induction E using Multiset.induction_on with
   | empty => simpa using h
   | cons A E ih => rw [Multiset.cons_add]; exact .weakR _ _ A ih
 
 /-- Weakening on both sides: `Γ ⊢ Δ` gives `Γ' ⊢ Δ'` whenever `Γ ≤ Γ'` and `Δ ≤ Δ'`. -/
-theorem weaken {Γ Γ' Δ Δ' : Multiset (Formula n)} (h : LK Γ Δ) (h1 : Γ ≤ Γ') (h2 : Δ ≤ Δ') :
+theorem weaken {Γ Γ' Δ Δ' : Multiset (Formula PS TS n)} (h : LK Γ Δ) (h1 : Γ ≤ Γ') (h2 : Δ ≤ Δ') :
     LK Γ' Δ' := by
   obtain ⟨E, rfl⟩ := Multiset.le_iff_exists_add.1 h1
   obtain ⟨F, rfl⟩ := Multiset.le_iff_exists_add.1 h2
   exact ((h.weakenL E).weakenR F).congr (add_comm _ _) (add_comm _ _)
 
+end
+
 /-- Contraction of a formula that already occurs in the left context. -/
-theorem contrL_of_mem {Γ Δ : Multiset (Formula n)} {A : Formula n} (hA : A ∈ Γ)
+theorem contrL_of_mem {Γ Δ : Multiset (Formula PS TS n)} {A : Formula PS TS n} (hA : A ∈ Γ)
     (h : LK (A ::ₘ Γ) Δ) : LK Γ Δ := by
   rw [← Multiset.cons_erase hA] at h ⊢
   exact .contrL _ _ A h
 
 /-- Contraction of a formula that already occurs in the right context. -/
-theorem contrR_of_mem {Γ Δ : Multiset (Formula n)} {A : Formula n} (hA : A ∈ Δ)
+theorem contrR_of_mem {Γ Δ : Multiset (Formula PS TS n)} {A : Formula PS TS n} (hA : A ∈ Δ)
     (h : LK Γ (A ::ₘ Δ)) : LK Γ Δ := by
   rw [← Multiset.cons_erase hA] at h ⊢
   exact .contrR _ _ A h
 
 /-- Moving a formula into a (left) central zone, with contraction if it is already there. -/
-theorem insertL_of_cons {Γ Δ : Multiset (Formula n)} {C : Finset (Formula n)} {A : Formula n}
+theorem insertL_of_cons {Γ Δ : Multiset (Formula PS TS n)} {C : Finset (Formula PS TS n)} {A : Formula PS TS n}
     (h : LK (A ::ₘ (Γ + C.val)) Δ) : LK (Γ + (insert A C).val) Δ := by
   by_cases hA : A ∈ C
   · rw [Finset.insert_eq_of_mem hA]
@@ -109,7 +117,7 @@ theorem insertL_of_cons {Γ Δ : Multiset (Formula n)} {C : Finset (Formula n)} 
   · rw [Finset.insert_val_of_notMem hA, Multiset.add_cons]; exact h
 
 /-- Moving a formula into a (right) central zone, with contraction if it is already there. -/
-theorem insertR_of_cons {Γ Δ : Multiset (Formula n)} {C : Finset (Formula n)} {A : Formula n}
+theorem insertR_of_cons {Γ Δ : Multiset (Formula PS TS n)} {C : Finset (Formula PS TS n)} {A : Formula PS TS n}
     (h : LK Γ (A ::ₘ (C.val + Δ))) : LK Γ ((insert A C).val + Δ) := by
   by_cases hA : A ∈ C
   · rw [Finset.insert_eq_of_mem hA]
@@ -117,14 +125,14 @@ theorem insertR_of_cons {Γ Δ : Multiset (Formula n)} {C : Finset (Formula n)} 
   · rw [Finset.insert_val_of_notMem hA, Multiset.cons_add]; exact h
 
 /-- Moving a formula out of a (left) central zone, with weakening if it remains there. -/
-theorem cons_of_insertL {Γ Δ : Multiset (Formula n)} {C : Finset (Formula n)} {A : Formula n}
+theorem cons_of_insertL {Γ Δ : Multiset (Formula PS TS n)} {C : Finset (Formula PS TS n)} {A : Formula PS TS n}
     (h : LK (Γ + (insert A C).val) Δ) : LK (A ::ₘ (Γ + C.val)) Δ := by
   by_cases hA : A ∈ C
   · rw [Finset.insert_eq_of_mem hA] at h; exact .weakL _ _ A h
   · rw [Finset.insert_val_of_notMem hA, Multiset.add_cons] at h; exact h
 
 /-- Moving a formula out of a (right) central zone, with weakening if it remains there. -/
-theorem cons_of_insertR {Γ Δ : Multiset (Formula n)} {C : Finset (Formula n)} {A : Formula n}
+theorem cons_of_insertR {Γ Δ : Multiset (Formula PS TS n)} {C : Finset (Formula PS TS n)} {A : Formula PS TS n}
     (h : LK Γ ((insert A C).val + Δ)) : LK Γ (A ::ₘ (C.val + Δ)) := by
   by_cases hA : A ∈ C
   · rw [Finset.insert_eq_of_mem hA] at h; exact .weakR _ _ A h
@@ -140,7 +148,7 @@ local macro "mset_tac" : tactic => `(tactic| ((try simp only [← Multiset.singl
 local macro "mle_tac " E:term : tactic =>
   `(tactic| exact Multiset.le_iff_exists_add.2 ⟨$E, by mset_tac⟩)
 
-theorem lk_of_cutFree_aux {S : Sequent n}
+theorem lk_of_cutFree_aux {S : Sequent PS TS n}
     (h : Derivable Rule (fun S => True ∧ AllIn IsClassical S) S) :
     LK (S.L + S.CL.val) (S.CR.val + S.R) := by
   induction h with
@@ -278,7 +286,7 @@ theorem lk_of_cutFree_aux {S : Sequent n}
   -- the remaining rules involve a neutral formula, which cannot be classical
   all_goals
     exfalso
-    have hneu : ∀ {n : ℕ} (A : Formula n), A.IsClassical → A.pol ≠ .neu := fun A h => h.pol_ne_neu
+    have hneu : ∀ {n : ℕ} (A : Formula PS TS n), A.IsClassical → A.pol ≠ .neu := fun A h => h.pol_ne_neu
     simp only [IsClassical] at hA
     rename_i h1 h2
     first
@@ -287,19 +295,19 @@ theorem lk_of_cutFree_aux {S : Sequent n}
 
 /-- **Soundness with respect to LK**: a cut-free provable LU sequent `Γ;Γ' ⊢ Δ';Δ` made of
 classical formulas translates to an LK-provable sequent `Γ, Γ' ⊢ Δ', Δ`. -/
-theorem LK.of_cutFreeProvable_classical {S : Sequent n} (h : CutFreeProvable S)
+theorem LK.of_cutFreeProvable_classical {S : Sequent PS TS n} (h : CutFreeProvable S)
     (hS : AllIn IsClassical S) : LK (S.L + S.CL.val) (S.CR.val + S.R) :=
   lk_of_cutFree_aux (h.allIn subClosed_classical hS)
 
 /-- Every sequent provable within the classical fragment translates to an LK-provable
 sequent. -/
-theorem LK.of_provableWithin_classical {S : Sequent n} (h : ProvableWithin .classical S) :
+theorem LK.of_provableWithin_classical {S : Sequent PS TS n} (h : ProvableWithin .classical S) :
     LK (S.L + S.CL.val) (S.CR.val + S.R) :=
   LK.of_cutFreeProvable_classical h.cutFreeProvable (h.prop).1
 
 /-- Every classical sequent provable in LU (cuts allowed) translates to an LK-provable
 sequent, assuming cut elimination for LU. -/
-theorem LK.of_provable_classical (hce : CutElimination) {S : Sequent n}
+theorem LK.of_provable_classical (hce : CutElimination PS TS) {S : Sequent PS TS n}
     (hS : AllIn IsClassical S) (h : Provable S) : LK (S.L + S.CL.val) (S.CR.val + S.R) :=
   LK.of_cutFreeProvable_classical (hce S h) hS
 

@@ -15,14 +15,14 @@ public import RequestProject.LU.Subformula
 ## Representation
 
 Formulas are well-scoped.  The formula `A` substituted for an atom of arity `k` is a
-`Formula (m + k)`: its variables `0, …, m-1` are its *parameters* and its variables
-`m, …, m+k-1` are the distinguished variables `x₁, …, xₖ`.  When `B : Formula n` is traversed,
-a substitution `ρ : Subst m n` records how the parameters of `A` are read in the current
+`Formula PS TS (m + k)`: its variables `0, …, m-1` are its *parameters* and its variables
+`m, …, m+k-1` are the distinguished variables `x₁, …, xₖ`.  When `B : Formula PS TS n` is traversed,
+a substitution `ρ : Subst TS m n` records how the parameters of `A` are read in the current
 scope; it is weakened when a binder of `B` is crossed, so that the parameters are never
 captured ("usual precautions").  An atom `a t₁ … tₖ` is replaced by
 `A.subst (Fin.append ρ t)`, i.e. `A[ρ, t₁, …, tₖ]`.  At top level `m = n` and `ρ` is the
-identity: `B[λx⃗.A / a]` is `Formula.substPred a A B` for `A : Formula (n + a.arity)` and
-`B : Formula n`.
+identity: `B[λx⃗.A / a]` is `Formula.substPred a A B` for `A : Formula PS TS (n + PS.arity a)` and
+`B : Formula PS TS n`.
 
 ## Results
 
@@ -42,23 +42,26 @@ identity: `B[λx⃗.A / a]` is `Formula.substPred a A B` for `A : Formula (n + a
 
 namespace LU
 
+variable {PS : PredSig} {TS : TermSig} [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
 variable {n : ℕ}
 
-theorem Term.shift_subst_lift {k m : ℕ} (σ : Subst k m) (t : Term k) :
+omit [DecidableEq TS.Func] in
+theorem Tm.shift_subst_lift {k m : ℕ} (σ : Subst TS k m) (t : Tm TS k) :
     t.shift.subst (Subst.lift σ) = (t.subst σ).shift := by
-  rw [Subst.lift, Term.shift_subst_cons, Term.shift_subst]
+  rw [Subst.lift, Tm.shift_subst_cons, Tm.shift_subst]
 
 namespace Formula
 
 /-! ## Substitution of a formula for a predicate symbol -/
 
-/-- `substPredAt a A ρ B`: replace every atom `a t₁ … tₖ` of `B : Formula n` by
-`A[ρ, t₁, …, tₖ]`, where `ρ : Subst m n` gives the values of the parameters of
-`A : Formula (m + k)` in the current scope. -/
-def substPredAt (a : Pred) {m : ℕ} (A : Formula (m + a.arity)) :
-    {n : ℕ} → Subst m n → Formula n → Formula n
+/-- `substPredAt a A ρ B`: replace every atom `a t₁ … tₖ` of `B : Formula PS TS n` by
+`A[ρ, t₁, …, tₖ]`, where `ρ : Subst TS m n` gives the values of the parameters of
+`A : Formula PS TS (m + k)` in the current scope. -/
+def substPredAt (a : PS.Pred) {m : ℕ} (A : Formula PS TS (m + PS.arity a)) :
+    {n : ℕ} → Subst TS m n → Formula PS TS n → Formula PS TS n
   | _, ρ, atom p ts =>
-    if h : p = a then A.subst (Fin.append ρ (fun i => ts (Fin.cast (by rw [h]) i)))
+    if h : p = a then A.subst (Fin.append ρ (fun i => ts.get (Fin.cast (by rw [h]) i)))
     else atom p ts
   | _, _, one => one
   | _, _, zero => zero
@@ -82,13 +85,17 @@ def substPredAt (a : Pred) {m : ℕ} (A : Formula (m + a.arity)) :
   | _, ρ, cex B => cex (substPredAt a A (fun i => (ρ i).shift) B)
 
 /-- `B[λx₁…xₖ.A / a]`: replace every atom `a t₁ … tₖ` of `B` by `A[t₁, …, tₖ]`; the first `n`
-variables of `A : Formula (n + a.arity)` are its parameters, read in the scope of `B`. -/
-def substPred (a : Pred) (A : Formula (n + a.arity)) (B : Formula n) : Formula n :=
-  substPredAt a A Term.var B
+variables of `A : Formula PS TS (n + PS.arity a)` are its parameters, read in the scope of `B`. -/
+def substPred (a : PS.Pred) (A : Formula PS TS (n + PS.arity a)) (B : Formula PS TS n) : Formula PS TS n :=
+  substPredAt a A Tm.var B
+
+section
+
+omit [DecidableEq TS.Func]
 
 /-- If `A` has the polarity of `a`, substitution preserves polarities. -/
-theorem pol_substPredAt {a : Pred} {m : ℕ} {A : Formula (m + a.arity)} (hA : A.pol = a.pol)
-    (ρ : Subst m n) (B : Formula n) : (substPredAt a A ρ B).pol = B.pol := by
+theorem pol_substPredAt {a : PS.Pred} {m : ℕ} {A : Formula PS TS (m + PS.arity a)} (hA : A.pol = PS.predPol a)
+    (ρ : Subst TS m n) (B : Formula PS TS n) : (substPredAt a A ρ B).pol = B.pol := by
   induction B with
   | atom p ts =>
     by_cases h : p = a
@@ -96,13 +103,13 @@ theorem pol_substPredAt {a : Pred} {m : ℕ} {A : Formula (m + a.arity)} (hA : A
     · simp [substPredAt, h]
   | _ => simp_all [substPredAt, pol]
 
-theorem pol_substPred {a : Pred} {A : Formula (n + a.arity)} (hA : A.pol = a.pol)
-    (B : Formula n) : (substPred a A B).pol = B.pol := pol_substPredAt hA _ B
+theorem pol_substPred {a : PS.Pred} {A : Formula PS TS (n + PS.arity a)} (hA : A.pol = PS.predPol a)
+    (B : Formula PS TS n) : (substPred a A B).pol = B.pol := pol_substPredAt hA _ B
 
 /-- Substitution for an atom commutes with substitution of terms (no capture of
 parameters). -/
-theorem subst_substPredAt (a : Pred) {m : ℕ} (A : Formula (m + a.arity)) (B : Formula n) :
-    ∀ {k : ℕ} (ρ : Subst m n) (σ : Subst n k),
+theorem subst_substPredAt (a : PS.Pred) {m : ℕ} (A : Formula PS TS (m + PS.arity a)) (B : Formula PS TS n) :
+    ∀ {k : ℕ} (ρ : Subst TS m n) (σ : Subst TS n k),
       (substPredAt a A ρ B).subst σ = substPredAt a A (fun i => (ρ i).subst σ) (B.subst σ) := by
   induction B with
   | atom p ts =>
@@ -112,31 +119,33 @@ theorem subst_substPredAt (a : Pred) {m : ℕ} (A : Formula (m + a.arity)) (B : 
       simp only [substPredAt, subst, dite_true, subst_subst]
       congr 1
       funext i
-      refine Fin.addCases (fun j => ?_) (fun j => ?_) i <;> simp
+      refine Fin.addCases (fun j => ?_) (fun j => ?_) i <;> simp [Tms.get_subst]
     · simp [substPredAt, subst, h]
   | lall B ih | lex B ih | call B ih | cex B ih =>
     intro k ρ σ
-    simp only [substPredAt, subst, ih, Term.shift_subst_lift]
+    simp only [substPredAt, subst, ih, Tm.shift_subst_lift]
   | _ => intro k ρ σ; simp_all [substPredAt, subst]
 
 /-- Substitution for an atom commutes with weakening. -/
-theorem shift_substPredAt (a : Pred) {m : ℕ} (A : Formula (m + a.arity)) (ρ : Subst m n)
-    (B : Formula n) :
+theorem shift_substPredAt (a : PS.Pred) {m : ℕ} (A : Formula PS TS (m + PS.arity a)) (ρ : Subst TS m n)
+    (B : Formula PS TS n) :
     (substPredAt a A ρ B).shift = substPredAt a A (fun i => (ρ i).shift) B.shift := by
   simp only [shift, subst_substPredAt]
   congr 1
   funext i
-  simp only [Term.shift, Term.rename_eq_subst]
+  simp only [Tm.shift, Tm.rename_eq_subst]
   rfl
 
 /-- Substitution for an atom commutes with the instantiation of a bound variable. -/
-theorem inst_substPredAt (a : Pred) {m : ℕ} (A : Formula (m + a.arity)) (ρ : Subst m n)
-    (B : Formula (n + 1)) (t : Term n) :
+theorem inst_substPredAt (a : PS.Pred) {m : ℕ} (A : Formula PS TS (m + PS.arity a)) (ρ : Subst TS m n)
+    (B : Formula PS TS (n + 1)) (t : Tm TS n) :
     (substPredAt a A (fun i => (ρ i).shift) B).inst t = substPredAt a A ρ (B.inst t) := by
   simp only [inst, subst_substPredAt]
   congr 1
   funext i
   simp [Subst.single]
+
+end
 
 end Formula
 
@@ -144,46 +153,56 @@ end Formula
 
 namespace Formula
 
-theorem isClassical_substPredAt {a : Pred} {m : ℕ} {A : Formula (m + a.arity)} {B : Formula n}
-    (hA : A.IsClassical) (hB : B.IsClassical) (ρ : Subst m n) :
+section
+
+omit [DecidableEq TS.Func]
+
+theorem isClassical_substPredAt {a : PS.Pred} {m : ℕ} {A : Formula PS TS (m + PS.arity a)} {B : Formula PS TS n}
+    (hA : A.IsClassical) (hB : B.IsClassical) (ρ : Subst TS m n) :
     (substPredAt a A ρ B).IsClassical := by
   induction B with
   | atom p ts => by_cases h : p = a <;> simp_all [substPredAt, IsClassical]
-  | _ => simp_all [substPredAt, IsClassical]
+  | _ => first | exact (hB : False).elim | simp_all [substPredAt, IsClassical]
 
-theorem isIntuitionistic_substPredAt {a : Pred} {m : ℕ} {A : Formula (m + a.arity)}
-    {B : Formula n} (hA : A.IsIntuitionistic) (hB : B.IsIntuitionistic) (ρ : Subst m n) :
+theorem isIntuitionistic_substPredAt {a : PS.Pred} {m : ℕ} {A : Formula PS TS (m + PS.arity a)}
+    {B : Formula PS TS n} (hA : A.IsIntuitionistic) (hB : B.IsIntuitionistic) (ρ : Subst TS m n) :
     (substPredAt a A ρ B).IsIntuitionistic := by
   induction B with
   | atom p ts => by_cases h : p = a <;> simp_all [substPredAt, IsIntuitionistic]
-  | _ => simp_all [substPredAt, IsIntuitionistic]
+  | _ => first | exact (hB : False).elim | simp_all [substPredAt, IsIntuitionistic]
 
-theorem isNeutralInt_substPredAt {a : Pred} {m : ℕ} {A : Formula (m + a.arity)}
-    {B : Formula n} (hA : A.IsNeutralInt) (hB : B.IsNeutralInt) (ρ : Subst m n) :
+theorem isNeutralInt_substPredAt {a : PS.Pred} {m : ℕ} {A : Formula PS TS (m + PS.arity a)}
+    {B : Formula PS TS n} (hA : A.IsNeutralInt) (hB : B.IsNeutralInt) (ρ : Subst TS m n) :
     (substPredAt a A ρ B).IsNeutralInt := by
   induction B with
   | atom p ts => by_cases h : p = a <;> simp_all [substPredAt, IsNeutralInt]
-  | _ => simp_all [substPredAt, IsNeutralInt]
+  | _ => first | exact (hB : False).elim | simp_all [substPredAt, IsNeutralInt]
 
-theorem isLinear_substPredAt {a : Pred} {m : ℕ} {A : Formula (m + a.arity)} {B : Formula n}
-    (hA : A.IsLinear) (hB : B.IsLinear) (ρ : Subst m n) : (substPredAt a A ρ B).IsLinear := by
+theorem isLinear_substPredAt {a : PS.Pred} {m : ℕ} {A : Formula PS TS (m + PS.arity a)} {B : Formula PS TS n}
+    (hA : A.IsLinear) (hB : B.IsLinear) (ρ : Subst TS m n) : (substPredAt a A ρ B).IsLinear := by
   induction B with
   | atom p ts => by_cases h : p = a <;> simp_all [substPredAt, IsLinear]
-  | _ => simp_all [substPredAt, IsLinear]
+  | _ => first | exact (hB : False).elim | simp_all [substPredAt, IsLinear]
+
+end
 
 end Formula
 
 open Formula
 
 /-- The formulas of a fragment. -/
-def Fragment.Mem {n : ℕ} : Fragment → Formula n → Prop
+def Fragment.Mem {n : ℕ} : Fragment → Formula PS TS n → Prop
   | .classical => IsClassical
   | .intuitionistic => IsIntuitionistic
   | .neutralIntuitionistic => IsNeutralInt
   | .linear => IsLinear
 
-theorem Fragment.mem_substPredAt (F : Fragment) {a : Pred} {m : ℕ} {A : Formula (m + a.arity)}
-    {B : Formula n} (hA : F.Mem A) (hB : F.Mem B) (ρ : Subst m n) :
+section
+
+omit [DecidableEq TS.Func]
+
+theorem Fragment.mem_substPredAt (F : Fragment) {a : PS.Pred} {m : ℕ} {A : Formula PS TS (m + PS.arity a)}
+    {B : Formula PS TS n} (hA : F.Mem A) (hB : F.Mem B) (ρ : Subst TS m n) :
     F.Mem (Formula.substPredAt a A ρ B) := by
   cases F
   · exact isClassical_substPredAt hA hB ρ
@@ -193,40 +212,42 @@ theorem Fragment.mem_substPredAt (F : Fragment) {a : Pred} {m : ℕ} {A : Formul
 
 /-- **Substitution property** (§6): each of the four fragments is closed under substitution:
 if `B` and `A` are formulas of the fragment `F`, then so is `B[λx⃗.A / a]`. -/
-theorem Fragment.mem_substPred (F : Fragment) {a : Pred} {A : Formula (n + a.arity)}
-    {B : Formula n} (hA : F.Mem A) (hB : F.Mem B) : F.Mem (substPred a A B) :=
+theorem Fragment.mem_substPred (F : Fragment) {a : PS.Pred} {A : Formula PS TS (n + PS.arity a)}
+    {B : Formula PS TS n} (hA : F.Mem A) (hB : F.Mem B) : F.Mem (substPred a A B) :=
   F.mem_substPredAt hA hB _
 
 /-! ## Substitution in sequents -/
 
+end
+
 /-- Substitution `S[λx⃗.A / a]` in all formulas of a sequent, the parameters of `A` being
 read through `ρ` in the scope of `S`. -/
-def Sequent.substPredAt (a : Pred) {m : ℕ} (A : Formula (m + a.arity)) (S : Sequent n)
-    (ρ : Subst m n) : Sequent n :=
+def Sequent.substPredAt (a : PS.Pred) {m : ℕ} (A : Formula PS TS (m + PS.arity a)) (S : Sequent PS TS n)
+    (ρ : Subst TS m n) : Sequent PS TS n :=
   ⟪S.L.map (Formula.substPredAt a A ρ) ; S.CL.image (Formula.substPredAt a A ρ) ⊢
     S.CR.image (Formula.substPredAt a A ρ) ; S.R.map (Formula.substPredAt a A ρ)⟫
 
 /-- `S[λx⃗.A / a]`: substitution in all formulas of a sequent; the first `n` variables of
 `A` are its parameters, read in the scope `n` of `S`. -/
-def Sequent.substPred (S : Sequent n) (a : Pred) (A : Formula (n + a.arity)) : Sequent n :=
-  S.substPredAt a A Term.var
+def Sequent.substPred (S : Sequent PS TS n) (a : PS.Pred) (A : Formula PS TS (n + PS.arity a)) : Sequent PS TS n :=
+  S.substPredAt a A Tm.var
 
-theorem mu_substPredAt {a : Pred} {m : ℕ} {A : Formula (m + a.arity)} (hA : A.pol = a.pol)
-    (S : Sequent n) (ρ : Subst m n) : mu (S.substPredAt a A ρ) = mu S := by
+theorem mu_substPredAt {a : PS.Pred} {m : ℕ} {A : Formula PS TS (m + PS.arity a)} (hA : A.pol = PS.predPol a)
+    (S : Sequent PS TS n) (ρ : Subst TS m n) : mu (S.substPredAt a A ρ) = mu S := by
   simp [mu, Sequent.substPredAt, Multiset.filter_map, Formula.pol_substPredAt hA]
 
-theorem allIn_substPredAt {a : Pred} {m : ℕ} {A : Formula (m + a.arity)}
-    {P : ∀ {n : ℕ}, Formula n → Prop}
-    (hP : ∀ {n : ℕ} (ρ : Subst m n) (B : Formula n), P B → P (Formula.substPredAt a A ρ B))
-    {S : Sequent n} (ρ : Subst m n) (hS : AllIn P S) : AllIn P (S.substPredAt a A ρ) := by
+theorem allIn_substPredAt {a : PS.Pred} {m : ℕ} {A : Formula PS TS (m + PS.arity a)}
+    {P : ∀ {n : ℕ}, Formula PS TS n → Prop}
+    (hP : ∀ {n : ℕ} (ρ : Subst TS m n) (B : Formula PS TS n), P B → P (Formula.substPredAt a A ρ B))
+    {S : Sequent PS TS n} (ρ : Subst TS m n) (hS : AllIn P S) : AllIn P (S.substPredAt a A ρ) := by
   intro B hB
   simp only [Sequent.formulas, Sequent.substPredAt, Multiset.mem_add, Multiset.mem_map,
     Finset.mem_val, Finset.mem_image] at hB
   rcases hB with ((⟨C, hC, rfl⟩ | ⟨C, hC, rfl⟩) | ⟨C, hC, rfl⟩) | ⟨C, hC, rfl⟩ <;>
     exact hP ρ C (hS C (by simp [Sequent.formulas, hC]))
 
-theorem Fragment.seq_substPredAt (F : Fragment) {a : Pred} {m : ℕ} {A : Formula (m + a.arity)}
-    (hAF : F.Mem A) (hA : A.pol = a.pol) {S : Sequent n} (ρ : Subst m n) (hS : F.Seq S) :
+theorem Fragment.seq_substPredAt (F : Fragment) {a : PS.Pred} {m : ℕ} {A : Formula PS TS (m + PS.arity a)}
+    (hAF : F.Mem A) (hA : A.pol = PS.predPol a) {S : Sequent PS TS n} (ρ : Subst TS m n) (hS : F.Seq S) :
     F.Seq (S.substPredAt a A ρ) := by
   cases F with
   | classical =>
@@ -249,30 +270,31 @@ theorem Fragment.seq_substPredAt (F : Fragment) {a : Pred} {m : ℕ} {A : Formul
 
 /-- If `A` is a formula of the fragment `F` with the polarity of `a`, then substitution maps
 sequents of `F` (e.g. classical sequents) to sequents of `F`. -/
-theorem Fragment.seq_substPred (F : Fragment) {a : Pred} {S : Sequent n}
-    {A : Formula (n + a.arity)} (hAF : F.Mem A) (hA : A.pol = a.pol) (hS : F.Seq S) :
+theorem Fragment.seq_substPred (F : Fragment) {a : PS.Pred} {S : Sequent PS TS n}
+    {A : Formula PS TS (n + PS.arity a)} (hAF : F.Mem A) (hA : A.pol = PS.predPol a) (hS : F.Seq S) :
     F.Seq (S.substPred a A) :=
   F.seq_substPredAt hAF hA _ hS
 
 /-! ## Substitution preserves provability -/
 
-theorem map_sh_substPredAt (a : Pred) {m : ℕ} (A : Formula (m + a.arity)) (ρ : Subst m n)
-    (Γ : Multiset (Formula n)) :
+omit [DecidableEq TS.Func] in
+theorem map_sh_substPredAt (a : PS.Pred) {m : ℕ} (A : Formula PS TS (m + PS.arity a)) (ρ : Subst TS m n)
+    (Γ : Multiset (Formula PS TS n)) :
     (sh Γ).map (Formula.substPredAt a A (fun i => (ρ i).shift)) =
       sh (Γ.map (Formula.substPredAt a A ρ)) := by
   simp only [sh, Multiset.map_map, Function.comp_def, Formula.shift_substPredAt]
 
-theorem image_shc_substPredAt (a : Pred) {m : ℕ} (A : Formula (m + a.arity)) (ρ : Subst m n)
-    (Γ : Finset (Formula n)) :
+theorem image_shc_substPredAt (a : PS.Pred) {m : ℕ} (A : Formula PS TS (m + PS.arity a)) (ρ : Subst TS m n)
+    (Γ : Finset (Formula PS TS n)) :
     (shc Γ).image (Formula.substPredAt a A (fun i => (ρ i).shift)) =
       shc (Γ.image (Formula.substPredAt a A ρ)) := by
   simp only [shc, Finset.image_image, Function.comp_def, Formula.shift_substPredAt]
 
 /-- The premise-matching relation: `p'` is `p` (a premise of the same kind) with the
 substitution applied at some depth. -/
-def SubstPrem (a : Pred) {m : ℕ} (A : Formula (m + a.arity)) : Premise n → Premise n → Prop
-  | .same s', .same s => ∃ ρ : Subst m n, s' = s.substPredAt a A ρ
-  | .up s', .up s => ∃ ρ : Subst m (n + 1), s' = s.substPredAt a A ρ
+def SubstPrem (a : PS.Pred) {m : ℕ} (A : Formula PS TS (m + PS.arity a)) : Premise PS TS n → Premise PS TS n → Prop
+  | .same s', .same s => ∃ ρ : Subst TS m n, s' = s.substPredAt a A ρ
+  | .up s', .up s => ∃ ρ : Subst TS m (n + 1), s' = s.substPredAt a A ρ
   | _, _ => False
 
 local macro "prem_tac " d:term : tactic => `(tactic| (
@@ -296,8 +318,8 @@ local macro "prem_tac " d:term : tactic => `(tactic| (
 
 set_option maxHeartbeats 4000000 in
 /-- Each cut-free rule instance is mapped by substitution to a rule instance. -/
-theorem Rule.substPredAt {a : Pred} {m : ℕ} {A : Formula (m + a.arity)} (hA : A.pol = a.pol)
-    {ps : List (Premise n)} {c : Sequent n} (hr : Rule ps c) (ρ : Subst m n) :
+theorem Rule.substPredAt {a : PS.Pred} {m : ℕ} {A : Formula PS TS (m + PS.arity a)} (hA : A.pol = PS.predPol a)
+    {ps : List (Premise PS TS n)} {c : Sequent PS TS n} (hr : Rule ps c) (ρ : Subst TS m n) :
     ∃ ps', Rule ps' (c.substPredAt a A ρ) ∧ List.Forall₂ (SubstPrem a A) ps' ps := by
   cases hr <;>
     try simp only [Sequent.substPredAt, Multiset.map_cons, Multiset.map_add,
@@ -796,8 +818,8 @@ theorem Rule.substPredAt {a : Pred} {m : ℕ} {A : Formula (m + a.arity)} (hA : 
     · prem_tac ρ
 
 /-- Each cut instance is mapped by substitution to a cut instance. -/
-theorem CutRule.substPredAt {a : Pred} {m : ℕ} {A : Formula (m + a.arity)}
-    {ps : List (Premise n)} {c : Sequent n} (hr : CutRule ps c) (ρ : Subst m n) :
+theorem CutRule.substPredAt {a : PS.Pred} {m : ℕ} {A : Formula PS TS (m + PS.arity a)}
+    {ps : List (Premise PS TS n)} {c : Sequent PS TS n} (hr : CutRule ps c) (ρ : Subst TS m n) :
     ∃ ps', CutRule ps' (c.substPredAt a A ρ) ∧ List.Forall₂ (SubstPrem a A) ps' ps := by
   cases hr <;>
     simp only [Sequent.substPredAt, Multiset.map_add]
@@ -827,12 +849,12 @@ theorem forall₂_exists_of_mem_left {α β : Type*} {R : α → β → Prop} {l
     · obtain ⟨y, hy, h⟩ := ih hx
       exact ⟨y, List.mem_cons_of_mem _ hy, h⟩
 
-theorem Derivable.substPredAt {R : ∀ {n : ℕ}, List (Premise n) → Sequent n → Prop}
-    {P : ∀ {n : ℕ}, Sequent n → Prop} {a : Pred} {m : ℕ} {A : Formula (m + a.arity)}
-    (hR : ∀ {n : ℕ} (ps : List (Premise n)) (c : Sequent n) (ρ : Subst m n), R ps c →
+theorem Derivable.substPredAt {R : ∀ {n : ℕ}, List (Premise PS TS n) → Sequent PS TS n → Prop}
+    {P : ∀ {n : ℕ}, Sequent PS TS n → Prop} {a : PS.Pred} {m : ℕ} {A : Formula PS TS (m + PS.arity a)}
+    (hR : ∀ {n : ℕ} (ps : List (Premise PS TS n)) (c : Sequent PS TS n) (ρ : Subst TS m n), R ps c →
       ∃ ps', R ps' (c.substPredAt a A ρ) ∧ List.Forall₂ (SubstPrem a A) ps' ps)
-    (hP : ∀ {n : ℕ} (S : Sequent n) (ρ : Subst m n), P S → P (S.substPredAt a A ρ))
-    {S : Sequent n} (h : Derivable R P S) (ρ : Subst m n) :
+    (hP : ∀ {n : ℕ} (S : Sequent PS TS n) (ρ : Subst TS m n), P S → P (S.substPredAt a A ρ))
+    {S : Sequent PS TS n} (h : Derivable R P S) (ρ : Subst TS m n) :
     Derivable R P (S.substPredAt a A ρ) := by
   induction h with
   | mk ps c hr hc _ _ ihs ihu =>
@@ -845,13 +867,13 @@ theorem Derivable.substPredAt {R : ∀ {n : ℕ}, List (Premise n) → Sequent n
 
 /-- **Substitution preserves cut-free provability**: if `S` has a cut-free proof in LU and
 `A` has the polarity of `a`, then `S[λx⃗.A / a]` has a cut-free proof. -/
-theorem CutFreeProvable.substPred {a : Pred} {S : Sequent n} {A : Formula (n + a.arity)}
-    (hA : A.pol = a.pol) (h : CutFreeProvable S) : CutFreeProvable (S.substPred a A) :=
+theorem CutFreeProvable.substPred {a : PS.Pred} {S : Sequent PS TS n} {A : Formula PS TS (n + PS.arity a)}
+    (hA : A.pol = PS.predPol a) (h : CutFreeProvable S) : CutFreeProvable (S.substPred a A) :=
   Derivable.substPredAt (fun _ _ ρ hr => hr.substPredAt hA ρ) (fun _ _ _ => trivial) h _
 
 /-- **Substitution preserves provability** in LU (with cut). -/
-theorem Provable.substPred {a : Pred} {S : Sequent n} {A : Formula (n + a.arity)}
-    (hA : A.pol = a.pol) (h : Provable S) : Provable (S.substPred a A) :=
+theorem Provable.substPred {a : PS.Pred} {S : Sequent PS TS n} {A : Formula PS TS (n + PS.arity a)}
+    (hA : A.pol = PS.predPol a) (h : Provable S) : Provable (S.substPred a A) :=
   Derivable.substPredAt
     (fun _ _ ρ hr => hr.elim
       (fun hr => (hr.substPredAt hA ρ).imp fun _ h => ⟨Or.inl h.1, h.2⟩)
@@ -861,8 +883,8 @@ theorem Provable.substPred {a : Pred} {S : Sequent n} {A : Formula (n + a.arity)
 /-- **Substitution preserves provability within a fragment**: if `S` is provable within the
 fragment `F` and `A` is a formula of `F` with the polarity of `a`, then `S[λx⃗.A / a]` is
 provable within `F`. -/
-theorem ProvableWithin.substPred {F : Fragment} {a : Pred} {S : Sequent n}
-    {A : Formula (n + a.arity)} (hAF : F.Mem A) (hA : A.pol = a.pol)
+theorem ProvableWithin.substPred {F : Fragment} {a : PS.Pred} {S : Sequent PS TS n}
+    {A : Formula PS TS (n + PS.arity a)} (hAF : F.Mem A) (hA : A.pol = PS.predPol a)
     (h : ProvableWithin F S) : ProvableWithin F (S.substPred a A) :=
   Derivable.substPredAt (fun _ _ ρ hr => hr.substPredAt hA ρ)
     (fun _ ρ hS => F.seq_substPredAt hAF hA ρ hS) h _

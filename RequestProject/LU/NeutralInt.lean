@@ -18,15 +18,18 @@ public import RequestProject.LU.Subformula
 
 namespace LU
 
+variable {PS : PredSig} {TS : TermSig} [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
 variable {n : ℕ}
 
 open Formula
 
-theorem linear_within {S : Sequent n} (h : CutFreeProvable S) (hS : LinearSeq S) :
+theorem linear_within {S : Sequent PS TS n} (h : CutFreeProvable S) (hS : LinearSeq S) :
     ProvableWithin .linear S :=
   (h.allIn subClosed_linear hS).mono (fun _ _ h => h) (fun _ h => h.2)
 
-theorem Formula.IsNeutralInt.pol_eq {A : Formula n} (h : A.IsNeutralInt) : A.pol = .neu := by
+omit [DecidableEq PS.Pred] [DecidableEq TS.Func] in
+theorem Formula.IsNeutralInt.pol_eq {A : Formula PS TS n} (h : A.IsNeutralInt) : A.pol = .neu := by
   induction A with
   | atom p ts => exact h
   | conj A B ihA ihB => simp [pol, ihA h.1, ihB h.2, Pol.conj]
@@ -35,23 +38,23 @@ theorem Formula.IsNeutralInt.pol_eq {A : Formula n} (h : A.IsNeutralInt) : A.pol
   | _ => exact h.elim
 
 /-- The shape of a neutral intuitionistic sequent, apart from the bound on `Γ`. -/
-def NeutShape (S : Sequent n) : Prop :=
+def NeutShape (S : Sequent PS TS n) : Prop :=
   AllIn IsNeutralInt S ∧ S.CR = ∅ ∧ Multiset.card S.R = 1
 
 set_option maxHeartbeats 4000000 in
 /-- Rule analysis for the neutral intuitionistic fragment. -/
-theorem Rule.neutral {ps : List (Premise n)} {c : Sequent n} (hr : Rule ps c) (hc : NeutShape c) :
+theorem Rule.neutral {ps : List (Premise PS TS n)} {c : Sequent PS TS n} (hr : Rule ps c) (hc : NeutShape c) :
     (∀ p ∈ ps, p.All (fun p => p.CR = ∅ ∧ Multiset.card p.R = 1)) ∧
       (ps = [] → Multiset.card c.L ≤ 1) ∧
       (ps ≠ [] → ∃ p ∈ ps, p.All (fun p => Multiset.card c.L ≤ Multiset.card p.L)) := by
   obtain ⟨hA, hCR, hR⟩ : AllIn IsNeutralInt c ∧ c.CR = ∅ ∧ Multiset.card c.R = 1 := hc
-  have hpol : ∀ {n : ℕ} (A : Formula n), A.IsNeutralInt → A.pol = .neu := fun A h => h.pol_eq
+  have hpol : ∀ {n : ℕ} (A : Formula PS TS n), A.IsNeutralInt → A.pol = .neu := fun A h => h.pol_eq
   cases hr <;>
     simp only [allIn_mk, Multiset.mem_cons, Multiset.mem_add, Multiset.mem_singleton,
       or_imp, forall_and, forall_eq, IsNeutralInt] at hA <;>
     simp_all
 
-theorem neutral_main {S : Sequent n} (h : CutFreeProvable S) (hS : NeutShape S) :
+theorem neutral_main {S : Sequent PS TS n} (h : CutFreeProvable S) (hS : NeutShape S) :
     Multiset.card S.L ≤ 1 ∧ ProvableWithin .neutralIntuitionistic S := by
   unfold CutFreeProvable at h
   induction h with
@@ -75,13 +78,13 @@ theorem neutral_main {S : Sequent n} (h : CutFreeProvable S) (hS : NeutShape S) 
     exact ⟨hL, .mk' ps c hr ⟨hS.1, hS.2.1, hS.2.2, hL⟩ fun p hp => (ihp p hp).imp fun _ h => h.2⟩
 
 /-- **Theorem (§6), neutral intuitionistic fragment, cut-free version.** -/
-theorem neutralInt_within {S : Sequent n} (h : CutFreeProvable S) (hS : NeutralIntSeq S) :
+theorem neutralInt_within {S : Sequent PS TS n} (h : CutFreeProvable S) (hS : NeutralIntSeq S) :
     ProvableWithin .neutralIntuitionistic S :=
   (neutral_main h ⟨hS.1, hS.2.1, hS.2.2.1⟩).2
 
 /-- In the neutral intuitionistic fragment, a cut-free provable sequent `Γ;Γ' ⊢ ;S` has at
 most one formula in `Γ` (the "head variable"). -/
-theorem neutral_headVariable {S : Sequent n} (h : CutFreeProvable S)
+theorem neutral_headVariable {S : Sequent PS TS n} (h : CutFreeProvable S)
     (hA : AllIn IsNeutralInt S) (hCR : S.CR = ∅) (hR : Multiset.card S.R = 1) :
     Multiset.card S.L ≤ 1 :=
   (neutral_main h ⟨hA, hCR, hR⟩).1

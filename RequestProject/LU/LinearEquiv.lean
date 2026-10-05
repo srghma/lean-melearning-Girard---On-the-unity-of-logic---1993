@@ -38,6 +38,8 @@ of `Γ; ⊢ ;Δ`, the sequent `Γ ⊢ Δ` is provable in linear logic.  Together
 
 namespace LU
 
+variable {PS : PredSig} {TS : TermSig} [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
 variable {n : ℕ}
 
 open Formula
@@ -46,8 +48,8 @@ open Formula
 
 /-- Linear formulas all of whose atoms are neutral ("declaring all atomic propositions to
 be neutral", §4). -/
-def Formula.IsNeutralLinear {n : ℕ} : Formula n → Prop
-  | atom p _ => p.pol = .neu
+def Formula.IsNeutralLinear {n : ℕ} : Formula PS TS n → Prop
+  | atom p _ => PS.predPol p = .neu
   | one => True
   | zero => True
   | bot => True
@@ -64,11 +66,17 @@ def Formula.IsNeutralLinear {n : ℕ} : Formula n → Prop
   | lex A => A.IsNeutralLinear
   | _ => False
 
-@[simp] theorem Formula.isNeutralLinear_subst {m : ℕ} (A : Formula n) (σ : Subst n m) :
-    (A.subst σ).IsNeutralLinear ↔ A.IsNeutralLinear := by
-  induction A generalizing m <;> simp_all [subst, IsNeutralLinear]
+section
 
-theorem subClosed_neutralLinear : SubClosed IsNeutralLinear where
+omit [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
+@[simp] theorem Formula.isNeutralLinear_subst {m : ℕ} (A : Formula PS TS n) (σ : Subst TS n m) :
+    (A.subst σ).IsNeutralLinear ↔ A.IsNeutralLinear := by
+  induction A generalizing m with
+  | atom p ts => exact Iff.rfl
+  | _ => first | exact Iff.rfl | simp_all [subst, IsNeutralLinear]
+
+theorem subClosed_neutralLinear : SubClosed (PS := PS) (TS := TS) IsNeutralLinear where
   neg _ h := h
   bang _ h := h
   quest _ h := h
@@ -88,9 +96,11 @@ theorem subClosed_neutralLinear : SubClosed IsNeutralLinear where
   shift A h := by simpa [shift] using h
   inst A t h := by simpa [inst] using h
 
-theorem Formula.IsNeutralLinear.isLinear {A : Formula n} (h : A.IsNeutralLinear) :
+theorem Formula.IsNeutralLinear.isLinear {A : Formula PS TS n} (h : A.IsNeutralLinear) :
     A.IsLinear := by
   induction A <;> simp_all [IsNeutralLinear, IsLinear]
+
+end
 
 /-- Close an equation between multisets built from `+`, `::ₘ`, `{·}`, `0`, `map` and `sh`. -/
 local macro "mset_tac" : tactic => `(tactic| ((try simp only [← Multiset.singleton_add,
@@ -104,12 +114,16 @@ local macro "llc " h:term : term => `(LL.congr $h (by mset_tac) (by mset_tac))
 
 namespace LL
 
-theorem cut' {Γ Λ Δ Θ : Multiset (Formula n)} (A : Formula n) (h₁ : LL true Γ (A ::ₘ Δ))
+section
+
+omit [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
+theorem cut' {Γ Λ Δ Θ : Multiset (Formula PS TS n)} (A : Formula PS TS n) (h₁ : LL true Γ (A ::ₘ Δ))
     (h₂ : LL true (A ::ₘ Λ) Θ) : LL true (Γ + Λ) (Δ + Θ) := .cut A rfl h₁ h₂
 
 /-- Contraction of a whole multiset `!M`. -/
-theorem bangC_all {b : Bool} (M : Multiset (Formula n)) :
-    ∀ {Γ Δ : Multiset (Formula n)}, LL b (M.map bang + M.map bang + Γ) Δ →
+theorem bangC_all {b : Bool} (M : Multiset (Formula PS TS n)) :
+    ∀ {Γ Δ : Multiset (Formula PS TS n)}, LL b (M.map bang + M.map bang + Γ) Δ →
       LL b (M.map bang + Γ) Δ := by
   induction M using Multiset.induction_on with
   | empty => intro Γ Δ h; simpa using h
@@ -120,8 +134,8 @@ theorem bangC_all {b : Bool} (M : Multiset (Formula n)) :
     exact llc (LL.bangC h2)
 
 /-- Contraction of a whole multiset `?M`. -/
-theorem questC_all {b : Bool} (M : Multiset (Formula n)) :
-    ∀ {Γ Δ : Multiset (Formula n)}, LL b Γ (M.map quest + M.map quest + Δ) →
+theorem questC_all {b : Bool} (M : Multiset (Formula PS TS n)) :
+    ∀ {Γ Δ : Multiset (Formula PS TS n)}, LL b Γ (M.map quest + M.map quest + Δ) →
       LL b Γ (M.map quest + Δ) := by
   induction M using Multiset.induction_on with
   | empty => intro Γ Δ h; simpa using h
@@ -132,16 +146,18 @@ theorem questC_all {b : Bool} (M : Multiset (Formula n)) :
     exact llc (LL.questC h2)
 
 /-- Contraction of the translated central zones `!Γ'` and `?Δ'`. -/
-theorem contr_central {b : Bool} {Γ' Δ' Γ Δ : Multiset (Formula n)}
+theorem contr_central {b : Bool} {Γ' Δ' Γ Δ : Multiset (Formula PS TS n)}
     (h : LL b (Γ.map bang + Γ.map bang + Γ') (Δ.map quest + Δ.map quest + Δ')) :
     LL b (Γ.map bang + Γ') (Δ.map quest + Δ') :=
   bangC_all Γ (questC_all Δ h)
 
+end
+
 /-- Inserting a formula in a central zone translated by a map `F` producing `!`-formulas
 (left): with the formula already present, this is a contraction (resp. a weakening). -/
-theorem central_insertL {m : ℕ} {b : Bool} {F : Formula m → Formula n}
-    (hF : ∀ B, ∃ X, F B = bang X) {A : Formula m} {C : Finset (Formula m)}
-    {Γ Δ : Multiset (Formula n)} :
+theorem central_insertL {m : ℕ} {b : Bool} {F : Formula PS TS m → Formula PS TS n}
+    (hF : ∀ B, ∃ X, F B = bang X) {A : Formula PS TS m} {C : Finset (Formula PS TS m)}
+    {Γ Δ : Multiset (Formula PS TS n)} :
     LL b (F A ::ₘ (Γ + C.val.map F)) Δ ↔ LL b (Γ + (insert A C).val.map F) Δ := by
   by_cases hA : A ∈ C
   · rw [Finset.insert_eq_of_mem hA]
@@ -159,9 +175,9 @@ theorem central_insertL {m : ℕ} {b : Bool} {F : Formula m → Formula n}
 
 /-- Inserting a formula in a central zone translated by a map `F` producing `?`-formulas
 (right). -/
-theorem central_insertR {m : ℕ} {b : Bool} {F : Formula m → Formula n}
-    (hF : ∀ B, ∃ X, F B = quest X) {A : Formula m} {C : Finset (Formula m)}
-    {Γ Δ : Multiset (Formula n)} :
+theorem central_insertR {m : ℕ} {b : Bool} {F : Formula PS TS m → Formula PS TS n}
+    (hF : ∀ B, ∃ X, F B = quest X) {A : Formula PS TS m} {C : Finset (Formula PS TS m)}
+    {Γ Δ : Multiset (Formula PS TS n)} :
     LL b Γ (F A ::ₘ (C.val.map F + Δ)) ↔ LL b Γ ((insert A C).val.map F + Δ) := by
   by_cases hA : A ∈ C
   · rw [Finset.insert_eq_of_mem hA]
@@ -181,23 +197,61 @@ end LL
 
 /-! ## The "easy inductive argument" -/
 
-/-- **Strengthened `!` rule** (§4).  For a linear formula with neutral atoms: if `A` is
-positive then `A ⊢ !A` is provable in LL, and if `A` is negative then `?A ⊢ A` is provable
-in LL. -/
-theorem Formula.IsNeutralLinear.bang_quest {A : Formula n} (hA : A.IsNeutralLinear) :
+/-- Linear formulas all of whose atoms are neutral, except possibly atoms occurring under
+`!` or `?`.  These are the formulas for which the polarity computed by Table 1 is "honest"
+(the "easy inductive argument" of §4 applies to them); they contain the linear formulas
+with neutral atoms, and the Table 3 translations of all formulas. -/
+def Formula.IsGuardedLinear {n : ℕ} : Formula PS TS n → Prop
+  | atom p _ => PS.predPol p = .neu
+  | one => True
+  | zero => True
+  | bot => True
+  | top => True
+  | neg A => A.IsGuardedLinear
+  | bang A => A.IsLinear
+  | quest A => A.IsLinear
+  | tensor A B => A.IsGuardedLinear ∧ B.IsGuardedLinear
+  | par A B => A.IsGuardedLinear ∧ B.IsGuardedLinear
+  | lolli A B => A.IsGuardedLinear ∧ B.IsGuardedLinear
+  | with_ A B => A.IsGuardedLinear ∧ B.IsGuardedLinear
+  | plus A B => A.IsGuardedLinear ∧ B.IsGuardedLinear
+  | lall A => A.IsGuardedLinear
+  | lex A => A.IsGuardedLinear
+  | _ => False
+
+section
+
+omit [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
+theorem Formula.IsGuardedLinear.isLinear {A : Formula PS TS n} (h : A.IsGuardedLinear) :
+    A.IsLinear := by
+  induction A <;> simp_all [IsGuardedLinear, IsLinear]
+
+theorem Formula.IsNeutralLinear.isGuardedLinear {A : Formula PS TS n} (h : A.IsNeutralLinear) :
+    A.IsGuardedLinear := by
+  induction A with
+  | bang A _ => exact IsNeutralLinear.isLinear (A := A) h
+  | quest A _ => exact IsNeutralLinear.isLinear (A := A) h
+  | _ => simp_all [IsNeutralLinear, IsGuardedLinear]
+
+/-- **Strengthened `!` rule** (§4), in the slightly more general form needed for Table 3.
+For a linear formula whose atoms are neutral, except possibly those guarded by `!` or `?`:
+if `A` is positive then `A ⊢ !A` is provable in LL, and if `A` is negative then `?A ⊢ A` is
+provable in LL. -/
+theorem Formula.IsGuardedLinear.bang_quest {A : Formula PS TS n} (hA : A.IsGuardedLinear) :
     (A.pol = .pos → LL true {A} {bang A}) ∧ (A.pol = .neg → LL true {quest A} {A}) := by
   induction A with
-  | atom p ts => simp_all [IsNeutralLinear, pol]
+  | atom p ts => simp_all [IsGuardedLinear, pol]
   | @one k =>
     refine ⟨fun _ => ?_, fun h => by simp [pol] at h⟩
-    have h1 : LL true (Multiset.map bang 0) ((one : Formula k) ::ₘ Multiset.map quest 0) :=
+    have h1 : LL true (Multiset.map bang 0) ((one : Formula PS TS k) ::ₘ Multiset.map quest 0) :=
       llc LL.oneR
     have h2 : LL true 0 {bang one} := llc (LL.bangR h1)
     exact llc (LL.oneL h2)
   | zero => exact ⟨fun _ => llc (LL.zeroL 0 {bang zero}), fun h => by simp [pol] at h⟩
   | @bot k =>
     refine ⟨fun h => by simp [pol] at h, fun _ => ?_⟩
-    have h1 : LL true ((bot : Formula k) ::ₘ Multiset.map bang 0) (Multiset.map quest 0) :=
+    have h1 : LL true ((bot : Formula PS TS k) ::ₘ Multiset.map bang 0) (Multiset.map quest 0) :=
       llc LL.botL
     have h2 : LL true {quest bot} 0 := llc (LL.questL h1)
     exact llc (LL.botR h2)
@@ -343,14 +397,27 @@ theorem Formula.IsNeutralLinear.bang_quest {A : Formula n} (hA : A.IsNeutralLine
         simpa [sh, Formula.shift, Formula.subst] using h3
       exact LL.lexL h4
     · simp only [pol, Pol.lex] at h; split at h <;> simp_all
-  | _ => simp [IsNeutralLinear] at hA
+  | _ => simp [IsGuardedLinear] at hA
+
+/-- **Strengthened `!` rule** (§4).  For a linear formula with neutral atoms: if `A` is
+positive then `A ⊢ !A` is provable in LL, and if `A` is negative then `?A ⊢ A` is provable
+in LL. -/
+theorem Formula.IsNeutralLinear.bang_quest {A : Formula PS TS n} (hA : A.IsNeutralLinear) :
+    (A.pol = .pos → LL true {A} {bang A}) ∧ (A.pol = .neg → LL true {quest A} {A}) :=
+  hA.isGuardedLinear.bang_quest
 
 /-! ## The strengthened `!` rule -/
 
+end
+
 namespace LL
 
-theorem bangD_all {b : Bool} (M : Multiset (Formula n)) :
-    ∀ {Γ Δ : Multiset (Formula n)}, LL b (M + Γ) Δ → LL b (M.map bang + Γ) Δ := by
+section
+
+omit [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
+theorem bangD_all {b : Bool} (M : Multiset (Formula PS TS n)) :
+    ∀ {Γ Δ : Multiset (Formula PS TS n)}, LL b (M + Γ) Δ → LL b (M.map bang + Γ) Δ := by
   induction M using Multiset.induction_on with
   | empty => intro Γ Δ h; simpa using h
   | cons a M ih =>
@@ -359,8 +426,8 @@ theorem bangD_all {b : Bool} (M : Multiset (Formula n)) :
     have h2 : LL b (a ::ₘ (M.map bang + Γ)) Δ := llc (ih h1)
     exact llc (LL.bangD h2)
 
-theorem questD_all {b : Bool} (M : Multiset (Formula n)) :
-    ∀ {Γ Δ : Multiset (Formula n)}, LL b Γ (M + Δ) → LL b Γ (M.map quest + Δ) := by
+theorem questD_all {b : Bool} (M : Multiset (Formula PS TS n)) :
+    ∀ {Γ Δ : Multiset (Formula PS TS n)}, LL b Γ (M + Δ) → LL b Γ (M.map quest + Δ) := by
   induction M using Multiset.induction_on with
   | empty => intro Γ Δ h; simpa using h
   | cons a M ih =>
@@ -370,8 +437,8 @@ theorem questD_all {b : Bool} (M : Multiset (Formula n)) :
     exact llc (LL.questD h2)
 
 /-- Remove the `!` of positive neutral linear formulas on the left (by cuts with `P ⊢ !P`). -/
-theorem unbang_all (M : Multiset (Formula n)) (hM : ∀ P ∈ M, P.IsNeutralLinear ∧ P.pol = .pos) :
-    ∀ {Γ Δ : Multiset (Formula n)}, LL true (M.map bang + Γ) Δ → LL true (M + Γ) Δ := by
+theorem unbang_all (M : Multiset (Formula PS TS n)) (hM : ∀ P ∈ M, P.IsNeutralLinear ∧ P.pol = .pos) :
+    ∀ {Γ Δ : Multiset (Formula PS TS n)}, LL true (M.map bang + Γ) Δ → LL true (M + Γ) Δ := by
   induction M using Multiset.induction_on with
   | empty => intro Γ Δ h; simpa using h
   | cons a M ih =>
@@ -382,8 +449,8 @@ theorem unbang_all (M : Multiset (Formula n)) (hM : ∀ P ∈ M, P.IsNeutralLine
     exact llc (ih (fun P hP => hM P (Multiset.mem_cons_of_mem hP)) h2)
 
 /-- Remove the `?` of negative neutral linear formulas on the right (by cuts with `?N ⊢ N`). -/
-theorem unquest_all (M : Multiset (Formula n)) (hM : ∀ N ∈ M, N.IsNeutralLinear ∧ N.pol = .neg) :
-    ∀ {Γ Δ : Multiset (Formula n)}, LL true Γ (M.map quest + Δ) → LL true Γ (M + Δ) := by
+theorem unquest_all (M : Multiset (Formula PS TS n)) (hM : ∀ N ∈ M, N.IsNeutralLinear ∧ N.pol = .neg) :
+    ∀ {Γ Δ : Multiset (Formula PS TS n)}, LL true Γ (M.map quest + Δ) → LL true Γ (M + Δ) := by
   induction M using Multiset.induction_on with
   | empty => intro Γ Δ h; simpa using h
   | cons a M ih =>
@@ -396,7 +463,7 @@ theorem unquest_all (M : Multiset (Formula n)) (hM : ∀ N ∈ M, N.IsNeutralLin
 
 /-- **The strengthened rule for `!`** (§4): in linear logic with neutral atoms, one can pass
 from `Γ ⊢ Δ, A` to `Γ ⊢ Δ, !A` as soon as `Γ` is positive and `Δ` negative. -/
-theorem bangR_strong {Γ Δ : Multiset (Formula n)} {A : Formula n}
+theorem bangR_strong {Γ Δ : Multiset (Formula PS TS n)} {A : Formula PS TS n}
     (hΓ : ∀ P ∈ Γ, P.IsNeutralLinear ∧ P.pol = .pos)
     (hΔ : ∀ N ∈ Δ, N.IsNeutralLinear ∧ N.pol = .neg) (h : LL true Γ (A ::ₘ Δ)) :
     LL true Γ (bang A ::ₘ Δ) := by
@@ -407,23 +474,31 @@ theorem bangR_strong {Γ Δ : Multiset (Formula n)} {A : Formula n}
   have h4 : LL true (Γ + 0) (Δ.map quest + {bang A}) := unbang_all Γ hΓ h3
   exact llc (unquest_all Δ hΔ h4)
 
+end
+
 end LL
 
 /-! ## Translating LU derivations into LL -/
 
-theorem sh_add (Γ Δ : Multiset (Formula n)) : sh (Γ + Δ) = sh Γ + sh Δ := Multiset.map_add _ _ _
+section
 
-theorem sh_map_bang (Γ : Multiset (Formula n)) : sh (Γ.map bang) = (sh Γ).map bang := by
+omit [DecidableEq PS.Pred] [DecidableEq TS.Func]
+
+theorem sh_add (Γ Δ : Multiset (Formula PS TS n)) : sh (Γ + Δ) = sh Γ + sh Δ := Multiset.map_add _ _ _
+
+theorem sh_map_bang (Γ : Multiset (Formula PS TS n)) : sh (Γ.map bang) = (sh Γ).map bang := by
   simp [sh, Multiset.map_map, Formula.shift, Formula.subst]
 
-theorem sh_map_quest (Γ : Multiset (Formula n)) : sh (Γ.map quest) = (sh Γ).map quest := by
+theorem sh_map_quest (Γ : Multiset (Formula PS TS n)) : sh (Γ.map quest) = (sh Γ).map quest := by
   simp [sh, Multiset.map_map, Formula.shift, Formula.subst]
+
+end
 
 set_option maxHeartbeats 4000000 in
 /-- **Translation of LU into LL** (§4).  An LU derivation (possibly with cuts) all of whose
 sequents consist of linear formulas with neutral atoms, of a sequent `Γ;Γ' ⊢ Δ';Δ`, yields an
 LL derivation (with cut) of `Γ, !Γ' ⊢ ?Δ', Δ`. -/
-theorem LL.of_derivable_neutralLinear {S : Sequent n}
+theorem LL.of_derivable_neutralLinear {S : Sequent PS TS n}
     (h : Derivable LURule (AllIn IsNeutralLinear) S) :
     LL true (S.L + S.CL.val.map bang) (S.CR.val.map quest + S.R) := by
   induction h with
@@ -431,8 +506,8 @@ theorem LL.of_derivable_neutralLinear {S : Sequent n}
   have ih := Premise.forall_all
     (Q := fun s => LL true (s.L + s.CL.val.map bang) (s.CR.val.map quest + s.R)) ihs ihu
   clear hs hu ihs ihu
-  have hB : ∀ {k : ℕ} (B : Formula k), ∃ X, bang B = bang X := fun B => ⟨B, rfl⟩
-  have hQ : ∀ {k : ℕ} (B : Formula k), ∃ X, quest B = quest X := fun B => ⟨B, rfl⟩
+  have hB : ∀ {k : ℕ} (B : Formula PS TS k), ∃ X, bang B = bang X := fun B => ⟨B, rfl⟩
+  have hQ : ∀ {k : ℕ} (B : Formula PS TS k), ∃ X, quest B = quest X := fun B => ⟨B, rfl⟩
   rcases hr with hr | hr
   · cases hr <;>
       simp only [List.mem_cons, List.not_mem_nil, or_false, forall_eq_or_imp, forall_eq,
@@ -565,14 +640,14 @@ theorem LL.of_derivable_neutralLinear {S : Sequent n}
 /-- §4, LU to LL: if `Γ; ⊢ ;Δ` has an LU derivation (possibly with cuts) in which every
 sequent consists of linear formulas with neutral atoms, then `Γ ⊢ Δ` is provable in linear
 logic. -/
-theorem LL.of_provable_neutralLinear {Γ Δ : Multiset (Formula n)}
+theorem LL.of_provable_neutralLinear {Γ Δ : Multiset (Formula PS TS n)}
     (h : Derivable LURule (AllIn IsNeutralLinear) ⟪Γ ; ∅ ⊢ ∅ ; Δ⟫) : LL true Γ Δ := by
   simpa using LL.of_derivable_neutralLinear h
 
 /-- §4, LU to LL, cut-free version: a cut-free LU proof of `Γ; ⊢ ;Δ` in which every formula
 is linear with neutral atoms translates into an LL proof of `Γ ⊢ Δ`.  (The hypothesis is only
 on the end-sequent: by the subformula property, it propagates to the whole proof.) -/
-theorem LL.of_cutFreeProvable_neutralLinear {Γ Δ : Multiset (Formula n)}
+theorem LL.of_cutFreeProvable_neutralLinear {Γ Δ : Multiset (Formula PS TS n)}
     (h : CutFreeProvable ⟪Γ ; ∅ ⊢ ∅ ; Δ⟫) (hS : AllIn IsNeutralLinear ⟪Γ ; ∅ ⊢ ∅ ; Δ⟫) :
     LL true Γ Δ := by
   have h' := Derivable.allIn subClosed_neutralLinear h hS
